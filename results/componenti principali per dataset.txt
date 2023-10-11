@@ -1,0 +1,29 @@
+componenti principali per dataset al variare della percentuale
+
+NSL_KDD:
+	99% => 68 componenti principali
+	98% => 55 componenti principali
+	97% => 45 componenti principali
+	96% => 36 componenti principali
+	95% => 29 componenti principali
+
+MALDROID:
+	99% => 28 componenti principali
+	98% => 25 componenti principali
+	97% => 23 componenti principali
+	96% => 21 componenti principali
+	95% => 20 componenti principali
+
+MALMEM:
+	99% => 16 componenti principali
+	98% => 13 componenti principali
+	97% => 10 componenti principali
+	96% => 9 componenti principali
+	95% => 8 componenti principali
+
+UNSWNUMERIC:
+	99% => 111 componenti principali
+	98% => 54 componenti principali
+	97% => 27 componenti principali
+	96% => 22 componenti principali
+	95% => 18 componenti principali
