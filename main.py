@@ -31,7 +31,7 @@ if __name__ == '__main__':
     dataset = datasetException(configuration['chosenDataset'])
     dsConf = config[dataset]
 
-    with open("results/result_" + dataset + ".txt", "w") as result_file:
+    with open("results/result_" + dataset + "_" + configuration['minSimilarityValues'] + ".txt", "w") as result_file:
 
         print("\n LOADING DATASET \n")
         train_dataset = Dataset(dsConf)
@@ -69,10 +69,10 @@ if __name__ == '__main__':
         except OSError as e:
             train_dictionary.buildDictionary(train_matrix.matrix)
         train_dictionary.buildNeighborCountBoxPlot()
-        result_file.write("Train neighborhood dictionaries:")
+        result_file.write("Number of isolated nodes in train matrix: " + str(train_dictionary.countIsolatedExamples())
+                          + "\n\n")
         printFunctions.printDictionaryOnFile("Train neighborhood count dictionary with percentage at " +
                                              configuration['minSimilarityValues'] + ":",
                                              train_dictionary.neighborCountDic, result_file)
-        result_file.write("\nNumber of isolated nodes in train matrix: " + str(train_dictionary.countIsolatedExamples()))
 
         result_file.close()

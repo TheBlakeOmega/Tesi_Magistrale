@@ -111,6 +111,6 @@ class NeighborDictionary:
         print("Saving boxplot on " + self.data_type + " neighbor count")
         plt.savefig(
             "results/plots/boxplot/" + self.configuration['chosenDataset'] + "_" + self.data_type +
-            "_neighbor_count_boxplot.jpeg")
+            "_neighbor_count_boxplot_" + self.configuration['minSimilarityValues'] + ".jpeg")
         print("Boxplot saved\n")
         plt.close()
