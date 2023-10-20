@@ -1,5 +1,6 @@
 import pickle
 import matplotlib.pyplot as plt
+import numpy as np
 
 """
 This class models a dictionary made by cosine similarity matrix. Each key-value pair in 'neighborDic' models a pair 
@@ -27,7 +28,7 @@ class NeighborDictionary:
         self.data_type = data_type
 
     """
-        This method compute neighborDic and neighborCountDic contained in the class
+        This method computes neighborDic and neighborCountDic contained in the class
         Parameters
         ----------
         :param matrix:
@@ -50,14 +51,16 @@ class NeighborDictionary:
                 print("ND: " + str(rowIndex) + " examples computed")
 
         if serialize:
-            with open(self.configuration['pathSimilarityDictionary'] + self.configuration['chosenDataset'] +
-                      "_" + self.data_type + "_similarity_dictionary.pkl", 'wb') as file:
+            with open(self.configuration['pathSimilarityDictionary'] + self.configuration['minSimilarityValues'] +
+                      "_similarity/" + self.configuration['chosenDataset'] + "_" + self.data_type +
+                      "_similarity_dictionary.pkl", 'wb') as file:
                 print("Saving " + self.data_type + " similarity dictionary in pickle object")
                 pickle.dump(self.neighborDic, file)
                 print("Dictionary saved")
                 file.close()
-            with open(self.configuration['pathSimilarityDictionary'] + self.configuration['chosenDataset'] +
-                      "_" + self.data_type + "_similarity_dictionary_count.pkl", 'wb') as file:
+            with open(self.configuration['pathSimilarityDictionary'] + self.configuration['minSimilarityValues'] +
+                      "_similarity/" + self.configuration['chosenDataset'] + "_" + self.data_type +
+                      "_similarity_dictionary_count.pkl", 'wb') as file:
                 print("Saving " + self.data_type + " similarity dictionary count in pickle object")
                 pickle.dump(self.neighborCountDic, file)
                 print("Count dictionary saved")
@@ -68,25 +71,29 @@ class NeighborDictionary:
     """
 
     def loadDictionary(self):
-        with open(self.configuration['pathSimilarityDictionary'] + self.configuration['chosenDataset'] +
-                  "_" + self.data_type + "_similarity_dictionary.pkl", 'rb') as file:
+        with open(self.configuration['pathSimilarityDictionary'] + self.configuration['minSimilarityValues'] +
+                  "_similarity/" + self.configuration['chosenDataset'] + "_" + self.data_type +
+                  "_similarity_dictionary.pkl", 'rb') as file:
             print("Loading " + self.data_type + " similarity dictionary from " +
-                  self.configuration['pathSimilarityDictionary'] + self.configuration['chosenDataset'] +
-                  "_" + self.data_type + "_similarity_dictionary.pkl")
+                  self.configuration['pathSimilarityDictionary'] + self.configuration['minSimilarityValues'] +
+                  "_similarity/" + self.configuration['chosenDataset'] + "_" + self.data_type +
+                  "_similarity_dictionary.pkl")
             self.neighborDic = pickle.load(file)
             print("Dictionary loaded")
             file.close()
-        with open(self.configuration['pathSimilarityDictionary'] + self.configuration['chosenDataset'] +
-                  "_" + self.data_type + "_similarity_dictionary_count.pkl", 'rb') as file:
+        with open(self.configuration['pathSimilarityDictionary'] + self.configuration['minSimilarityValues'] +
+                  "_similarity/" + self.configuration['chosenDataset'] + "_" + self.data_type +
+                  "_similarity_dictionary_count.pkl", 'rb') as file:
             print("Loading " + self.data_type + " similarity dictionary count from " +
-                  self.configuration['pathSimilarityDictionary'] + self.configuration['chosenDataset'] +
-                  "_" + self.data_type + "_similarity_dictionary_count.pkl")
+                  self.configuration['pathSimilarityDictionary'] + self.configuration['minSimilarityValues'] +
+                  "_similarity/" + self.configuration['chosenDataset'] + "_" + self.data_type +
+                  "_similarity_dictionary_count.pkl")
             self.neighborCountDic = pickle.load(file)
             print("Dictionary count loaded")
             file.close()
 
     """
-        This method count how many examples has no neighbors
+        This method counts how many examples has no neighbors
         Returns
         ----------
         :count:
@@ -101,7 +108,7 @@ class NeighborDictionary:
         return count
 
     """
-        This method build and serialize a boxplot that shows example number of neighbors' density
+        This method builds and serialize a boxplot that shows example number of neighbors' density
     """
 
     def buildNeighborCountBoxPlot(self):
@@ -114,3 +121,24 @@ class NeighborDictionary:
             "_neighbor_count_boxplot_" + self.configuration['minSimilarityValues'] + ".jpeg")
         print("Boxplot saved\n")
         plt.close()
+
+    """
+            This method computes evaluation metrics on count dictionary
+            Returns
+            ----------
+            :max_value:
+            number of neighbors from the examples that has maximum number of them
+            :min_value:
+            number of neighbors from the examples that has minimum number of them
+            :mean_value:
+            mean number of neighbors 
+            :standard_deviation:
+            standard deviation on neighbors count
+    """
+
+    def computeMesuresOnNeighborsCount(self):
+        max_value = np.max(list(self.neighborCountDic.values()))
+        min_value = np.min(list(self.neighborCountDic.values()))
+        mean_value = np.mean(list(self.neighborCountDic.values()))
+        standard_deviation = np.std(list(self.neighborCountDic.values()))
+        return max_value, min_value, mean_value, standard_deviation

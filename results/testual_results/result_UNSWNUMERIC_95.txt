@@ -18,7 +18,13 @@ Test similarity matrix:
  [ 0.392    0.3745   0.392   ...  0.03394  0.03394  0.3882 ]] 
 Shapes: (175341, 82332)
 
-Train neighborhood dictionaries:Train neighborhood count dictionary with percentage at 95::
+Number of isolated nodes in train matrix: 14
+MAX NEIGHBORS: 35564
+MIN NEIGHBORS: 0
+MEAN NEIGHBORS: 12014.775426169577
+STANDARD DEVIATION NEIGHBORS: 10739.131906898025
+
+Train neighborhood count dictionary with percentage at 95:
     0: 12436
     1: 452
     2: 871
@@ -175360,6 +175366,3 @@ Train neighborhood dictionaries:Train neighborhood count dictionary with percent
     175338: 13421
     175339: 30743
     175340: 30586
-
-
-Number of isolated nodes in train matrix: 14

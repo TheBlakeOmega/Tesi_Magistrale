@@ -19,6 +19,10 @@ Test similarity matrix:
 Shapes: (46876, 11720)
 
 Number of isolated nodes in train matrix: 38
+MAX NEIGHBORS: 8615
+MIN NEIGHBORS: 0
+MEAN NEIGHBORS: 2713.1101629831896
+STANDARD DEVIATION NEIGHBORS: 2028.9527250925366
 
 Train neighborhood count dictionary with percentage at 97:
     0: 3335
