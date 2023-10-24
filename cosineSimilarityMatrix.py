@@ -37,17 +37,17 @@ class CosineSimilarityMatrix:
     """
 
     def buildMatrix(self, rows_data, columns_data=None, serialize=True):
-        print("Computing " + self.data_type + " similarity matrix with shape: " + str(rows_data.shape[0]) + "," +
+        print("BSM: Computing " + self.data_type + " similarity matrix with shape: " + str(rows_data.shape[0]) + "," +
               (str(columns_data.shape[0]) if columns_data is not None else str(rows_data.shape[0])))
         matrix_float64 = cosine_similarity(rows_data, columns_data if columns_data is not None else rows_data)
-        print("Reducing " + self.data_type + " similarity matrix values' size")
+        print("BSM: Reducing " + self.data_type + " similarity matrix values' size")
         self.matrix = np.array(matrix_float64, dtype=np.float16)
         if serialize:
             with open(self.configuration['pathSimilarityMatrices'] + self.configuration['chosenDataset'] +
                       "_" + self.data_type + "_similarity_matrix.pkl", 'wb') as file:
-                print("Saving " + self.data_type + " similarity matrix in pickle object")
+                print("BSM: Saving " + self.data_type + " similarity matrix in pickle object")
                 pickle.dump(self.matrix, file)
-                print("Matrix saved")
+                print("BSM: Matrix saved")
                 file.close()
 
     """
@@ -55,14 +55,14 @@ class CosineSimilarityMatrix:
     """
 
     def buildValuesBoxPlot(self):
-        print("Building boxplot on " + self.data_type + " matrix's values")
+        print("BPSM: Building boxplot on " + self.data_type + " matrix's values")
         plt.figure(figsize=(10, 7))
         plt.boxplot(self.matrix.flatten())
-        print("Saving boxplot on " + self.data_type + " matrix's values")
+        print("BPSM: Saving boxplot on " + self.data_type + " matrix's values")
         plt.savefig(
             "results/plots/boxplot/" + self.configuration['chosenDataset'] + "_" + self.data_type +
             "_similarity_matrix_boxplot.jpeg")
-        print("Boxplot saved\n")
+        print("BPSM: Boxplot saved\n")
         plt.close()
 
     """
@@ -72,9 +72,9 @@ class CosineSimilarityMatrix:
     def loadMatrix(self):
         with open(self.configuration['pathSimilarityMatrices'] + self.configuration['chosenDataset'] +
                   "_" + self.data_type + "_similarity_matrix.pkl", 'rb') as file:
-            print("Loading " + self.data_type + " similarity matrix from " +
+            print("LSM: Loading " + self.data_type + " similarity matrix from " +
                   self.configuration['pathSimilarityMatrices'] + self.configuration['chosenDataset'] +
                   "_" + self.data_type + "train_similarity_matrix.pkl")
             self.matrix = pickle.load(file)
-            print("Matrix loaded")
+            print("LSM: Matrix loaded")
             file.close()

@@ -21,8 +21,8 @@ def buildPCAModel(data, dataset_name, components):
     pca_model = PCA(n_components=components, svd_solver='full')
     pca_model = pca_model.fit(data)
     joblib.dump(pca_model, "results/pcaModels/" + dataset_name + "_pca_" + str(components))
-    print("PCA Object Params: ", pca_model.get_params())
-    print("PCA estimated principal components: ", pca_model.n_components_)
+    print("BPCA: PCA Object Params: ", pca_model.get_params())
+    print("BPCA: PCA estimated principal components: ", pca_model.n_components_)
     return pca_model
 
 

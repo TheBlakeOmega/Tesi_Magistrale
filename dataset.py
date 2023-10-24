@@ -31,5 +31,5 @@ class Dataset:
         self.features.columns = self.features.columns.str.replace(' ', '')
         self.labels = pd.DataFrame(self.features[self.dataset_configuration.get('labelColumnName')])
         self.features.drop(columns=[self.dataset_configuration.get('labelColumnName')], inplace=True)
-        print(dataset_type + ' data loaded:\n    columns:' + str(len(self.features.columns)) + '    rows:' + str(
-            len(self.features.index)) + "\n\n")
+        print("LDS: " + dataset_type + ' data loaded:\n    columns:' + str(len(self.features.columns)) + '    rows:' +
+              str(len(self.features.index)) + "\n\n")

@@ -38,7 +38,7 @@ class NeighborDictionary:
     """
 
     def buildDictionary(self, matrix, serialize=True):
-        print("Computing " + self.data_type + " neighborhood dictionary")
+        print("BND: Computing " + self.data_type + " neighborhood dictionary")
         for rowIndex, row in enumerate(matrix):
             self.neighborDic[rowIndex] = []
             self.neighborCountDic[rowIndex] = 0
@@ -48,22 +48,22 @@ class NeighborDictionary:
                     self.neighborCountDic[rowIndex] += 1
 
             if rowIndex % 100 == 0:
-                print("ND: " + str(rowIndex) + " examples computed")
+                print("BND: " + str(rowIndex) + " examples computed")
 
         if serialize:
             with open(self.configuration['pathSimilarityDictionary'] + self.configuration['minSimilarityValues'] +
                       "_similarity/" + self.configuration['chosenDataset'] + "_" + self.data_type +
                       "_similarity_dictionary.pkl", 'wb') as file:
-                print("Saving " + self.data_type + " similarity dictionary in pickle object")
+                print("BND: Saving " + self.data_type + " similarity dictionary in pickle object")
                 pickle.dump(self.neighborDic, file)
-                print("Dictionary saved")
+                print("BND: Dictionary saved")
                 file.close()
             with open(self.configuration['pathSimilarityDictionary'] + self.configuration['minSimilarityValues'] +
                       "_similarity/" + self.configuration['chosenDataset'] + "_" + self.data_type +
                       "_similarity_dictionary_count.pkl", 'wb') as file:
-                print("Saving " + self.data_type + " similarity dictionary count in pickle object")
+                print("BND: Saving " + self.data_type + " similarity dictionary count in pickle object")
                 pickle.dump(self.neighborCountDic, file)
-                print("Count dictionary saved")
+                print("BND: Count dictionary saved")
                 file.close()
 
     """
@@ -74,22 +74,22 @@ class NeighborDictionary:
         with open(self.configuration['pathSimilarityDictionary'] + self.configuration['minSimilarityValues'] +
                   "_similarity/" + self.configuration['chosenDataset'] + "_" + self.data_type +
                   "_similarity_dictionary.pkl", 'rb') as file:
-            print("Loading " + self.data_type + " similarity dictionary from " +
+            print("LND: Loading " + self.data_type + " similarity dictionary from " +
                   self.configuration['pathSimilarityDictionary'] + self.configuration['minSimilarityValues'] +
                   "_similarity/" + self.configuration['chosenDataset'] + "_" + self.data_type +
                   "_similarity_dictionary.pkl")
             self.neighborDic = pickle.load(file)
-            print("Dictionary loaded")
+            print("LND: Dictionary loaded")
             file.close()
         with open(self.configuration['pathSimilarityDictionary'] + self.configuration['minSimilarityValues'] +
                   "_similarity/" + self.configuration['chosenDataset'] + "_" + self.data_type +
                   "_similarity_dictionary_count.pkl", 'rb') as file:
-            print("Loading " + self.data_type + " similarity dictionary count from " +
+            print("LND: Loading " + self.data_type + " similarity dictionary count from " +
                   self.configuration['pathSimilarityDictionary'] + self.configuration['minSimilarityValues'] +
                   "_similarity/" + self.configuration['chosenDataset'] + "_" + self.data_type +
                   "_similarity_dictionary_count.pkl")
             self.neighborCountDic = pickle.load(file)
-            print("Dictionary count loaded")
+            print("LND: Dictionary count loaded")
             file.close()
 
     """
@@ -112,14 +112,14 @@ class NeighborDictionary:
     """
 
     def buildNeighborCountBoxPlot(self):
-        print("Building boxplot on " + self.data_type + " neighbor count")
+        print("BPND: Building boxplot on " + self.data_type + " neighbor count")
         plt.figure(figsize=(10, 7))
         plt.boxplot(list(self.neighborCountDic.values()))
-        print("Saving boxplot on " + self.data_type + " neighbor count")
+        print("BPND: Saving boxplot on " + self.data_type + " neighbor count")
         plt.savefig(
             "results/plots/boxplot/" + self.configuration['chosenDataset'] + "_" + self.data_type +
             "_neighbor_count_boxplot_" + self.configuration['minSimilarityValues'] + ".jpeg")
-        print("Boxplot saved\n")
+        print("BPND: Boxplot saved\n")
         plt.close()
 
     """
