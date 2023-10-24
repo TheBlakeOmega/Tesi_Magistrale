@@ -14,7 +14,7 @@ Init Parameters
 program configuration
 :param dataset_configuration:
 dataset configuration
-:param dataset_configuration:
+:param chosen_pipeline:
 string with pipeline chosen in the configuration file
 :param result_file:
 txt file to write results
