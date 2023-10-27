@@ -26,8 +26,8 @@ if __name__ == '__main__':
     dataset = datasetException(configuration['chosenDataset'])
     dsConf = config[dataset]
 
-    with open("results/result_" + dataset + "_" + configuration['minSimilarityValues'] + configuration['chosenPipeline']
-              + ".txt", "w") as result_file:
+    with open("results/result_" + dataset + "_" + configuration['minSimilarityValues'] + "_"
+              + configuration['chosenPipeline'] + ".txt", "w") as result_file:
 
         pManager = PipeLineManager(configuration, dsConf, configuration['chosenPipeline'], result_file)
         pManager.runPipeline()
