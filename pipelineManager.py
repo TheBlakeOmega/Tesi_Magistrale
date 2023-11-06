@@ -1,7 +1,9 @@
 from dataset import Dataset
-from cosineSimilarityMatrix import CosineSimilarityMatrix
+from cosineSimilarityMatrix import CosineSimilarityMatrixTrain, CosineSimilarityMatrixTest
 import traceback
 import torch_directml
+import pickle
+from graphConvolutionalNetworkClassifier import GraphNetwork
 
 
 class PipeLineManager:
@@ -39,6 +41,14 @@ class PipeLineManager:
             except Exception as e:
                 traceback.print_exc()
                 raise Exception("Error during Graph creation")
+        elif self.chosen_pipeline == 'TRAIN_GCN':
+            try:
+                self._trainGraphConvolutionalNetwork()
+                print("GCN trained successfully.")
+                self.result_file.write("GCN trained successfully.")
+            except Exception as e:
+                traceback.print_exc()
+                raise Exception("Error during GCN train")
 
     def _buildGraph(self):
         """
@@ -55,8 +65,8 @@ class PipeLineManager:
               + '    rows:' + str(len(test_dataset.getFeatureData().index)) + "\n\n")
 
         print("\n GETTING COSINE SIMILARITY MATRICES \n")
-        train_matrix = CosineSimilarityMatrix()
-        test_matrix = CosineSimilarityMatrix()
+        train_matrix = CosineSimilarityMatrixTrain()
+        test_matrix = CosineSimilarityMatrixTest()
         try:
             train_matrix.loadMatrix(self.configuration['pathSimilarityMatrices'] + self.configuration['chosenDataset'] +
                                     "_train_similarity_matrix.pkl")
@@ -81,14 +91,33 @@ class PipeLineManager:
         # train_matrix.buildNeighborCountBoxPlotAndReport(float(self.configuration['minSimilarityValues']))
 
         print("\n COMPUTING TORCH GRAPHS \n")
-        train_graph = train_matrix.generateTorchGraph(train_dataset, float(self.configuration['minSimilarityValues']),
-                                                      torch_directml.device(),
-                                                      path=self.configuration['pathPytorchGraphs'] +
-                                                      self.configuration['chosenDataset'] + "_train_torch_graph.pkl")
-        test_graph = test_matrix.generateTorchGraph(train_dataset, float(self.configuration['minSimilarityValues']),
-                                                    torch_directml.device(), dataset_column=test_dataset,
-                                                    path=self.configuration['pathPytorchGraphs'] +
-                                                    self.configuration['chosenDataset'] + "_test_torch_graph.pkl")
+        device = torch_directml.device()
+        train_graph_save_path = (self.configuration['pathPytorchGraphs'] + self.configuration['chosenDataset']
+                                 + "_train_torch_graph.pkl")
+        train_graph = train_matrix.generateTrainTorchGraph(train_dataset,
+                                                           float(self.configuration['minSimilarityValues']),
+                                                           'cpu',
+                                                           path=train_graph_save_path)
         self.result_file.write("Train graph info:" + str(train_graph) + "\n\n")
-        self.result_file.write("Test graph info:" + str(test_graph) + "\n\n")
 
+    def _trainGraphConvolutionalNetwork(self):
+        """
+        This method runs the pipeline to train and serialize GCN model
+        """
+        device = torch_directml.device()
+        load_path = (self.configuration['pathPytorchGraphs'] + self.configuration['chosenDataset']
+                     + "_train_torch_graph.pkl")
+        with open(load_path, 'rb') as file:
+            print("BTG: Loading train graph from " + load_path)
+            train_graph = pickle.load(file)
+            print("BTG: Train graph loaded")
+            file.close()
+        model = GraphNetwork()
+        space = {
+            'epochs': 150,
+            'earlyStoppingThresh': 20
+        }
+        print("Starting GCN training on " + str(torch_directml.device_name(device.index)))
+        save_path = self.configuration['pathModels'] + self.configuration['chosenDataset'] + "_trained_GCN.pkl"
+        loss, train_time = model.train(train_graph, space, 'cpu', save_path)
+        self.result_file.write("Trained model result:" + "\nLoss: " + str(loss) + "\nTrain time: " + str(train_time))

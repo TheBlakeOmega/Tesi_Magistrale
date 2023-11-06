@@ -1,6 +1,8 @@
 import pandas as pd
 from sklearn.decomposition import PCA
+from sklearn.model_selection import train_test_split
 import pickle
+import torch
 
 
 class Dataset:
@@ -77,3 +79,40 @@ class Dataset:
         pca_data = pca_model.transform(pca_data)
         pca_data = pd.DataFrame(pca_data, columns=pca_model.get_feature_names_out())
         return pca_data
+
+    def computeMasks(self):
+        """
+        Compute masks of train or test and validation set
+        :return:
+        torch tensors representing masks of train or test and validation set
+        """
+        X, X_validation, y, y_validation = train_test_split(self.feature_data, self.label_data, test_size=0.2,
+                                                            random_state=12, stratify=self.label_data)
+        validation_mask = []
+        mask = []
+        for record in self.feature_data.index:
+            if record in X.index:
+                mask.append(True)
+                validation_mask.append(False)
+            else:
+                mask.append(False)
+                validation_mask.append(True)
+        torch_validation_mask = torch.tensor(validation_mask, dtype=torch.bool)
+        torch_mask = torch.tensor(mask, dtype=torch.bool)
+        return torch_mask, torch_validation_mask
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

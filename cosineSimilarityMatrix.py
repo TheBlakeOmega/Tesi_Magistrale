@@ -1,13 +1,15 @@
 from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
 import pickle
-import matplotlib.pyplot as plt
+import matplotlib as plt
 import torch
 from torch_geometric.data import Data
 import pandas as pd
+from abc import ABC, abstractmethod
+import torch_geometric.transforms as torch_transform
 
 
-class CosineSimilarityMatrix:
+class CosineSimilarityMatrix(ABC):
     """
     This class models a matrix where each cell with indexes i and j contains cosine similarity between example with
     index i in rows_data and example with index j in columns_data.
@@ -15,33 +17,10 @@ class CosineSimilarityMatrix:
 
     def __init__(self):
         self.matrix = None
-        self.rowsEqualToColumns = False
 
+    @abstractmethod
     def computeMatrix(self, rows, columns=None, save_path=None):
-        """
-        This method compute the matrix contained in the class
-        Parameters
-        ----------
-        :param rows:
-        dataSet that will be used as example on matrix's rows
-        :param columns:
-        dataSet that will be used as example on matrix's columns. If this parameter is None, rows_data parameter will be
-        used
-        :param save_path:
-        boolean that specifies fi the matrix will be serialized in a pickle object
-        """
-        print("BSM: Computing similarity matrix with shape: " + str(rows.shape[0]) + "," +
-              (str(columns.shape[0]) if columns is not None else str(rows.shape[0])))
-        self.rowsEqualToColumns = columns is None
-        matrix_float64 = cosine_similarity(rows, columns if columns is not None else rows)
-        print("BSM: Reducing similarity matrix values' size")
-        self.matrix = np.array(matrix_float64, dtype=np.float16)
-        if save_path is not None:
-            with open(save_path, 'wb') as file:
-                print("BSM: Saving similarity matrix in pickle object")
-                pickle.dump(self.matrix, file)
-                print("BSM: Matrix saved")
-                file.close()
+        pass
 
     def loadMatrix(self, load_path):
         """
@@ -52,7 +31,6 @@ class CosineSimilarityMatrix:
         with open(load_path, 'rb') as file:
             print("LSM: Loading similarity matrix from " + load_path)
             self.matrix = pickle.load(file)
-            self.rowsEqualToColumns = self.matrix.shape[0] == self.matrix.shape[1]
             print("LSM: Matrix loaded")
             file.close()
 
@@ -63,14 +41,6 @@ class CosineSimilarityMatrix:
         similarity matrix
         """
         return self.matrix
-
-    def areRowsEqualToColumns(self):
-        """
-        This method returns True if data used as rows were equals to Columns, False otherwise
-        :return:
-        rowsEqualToColumns attribute
-        """
-        return self.rowsEqualToColumns
 
     def buildSimilarityBoxPlot(self, path=None):
         """
@@ -129,7 +99,37 @@ class CosineSimilarityMatrix:
         standard_deviation = np.std(count_neighbor_list)
         return max_value, min_value, mean_value, standard_deviation, number_isolated_examples
 
-    def generateTorchGraph(self, dataset_row, threshold, device, dataset_column=None, path=None):
+
+class CosineSimilarityMatrixTrain(CosineSimilarityMatrix):
+    """
+    Train cosine similarity matrix
+    """
+    def computeMatrix(self, rows, columns=None, save_path=None):
+        """
+        This method compute the matrix contained in the class
+        Parameters
+        ----------
+        :param rows:
+        dataSet that will be used as example on matrix's rows
+        :param columns:
+        dataSet that will be used as example on matrix's columns. If this parameter is None, rows_data parameter will be
+        used
+        :param save_path:
+        boolean that specifies fi the matrix will be serialized in a pickle object
+        """
+        print("BSM: Computing similarity matrix with shape: " + str(rows.shape[0]) + "," +
+              str(rows.shape[0]))
+        matrix_float64 = cosine_similarity(rows, rows)
+        print("BSM: Reducing similarity matrix values' size")
+        self.matrix = np.array(matrix_float64, dtype=np.float16)
+        if save_path is not None:
+            with open(save_path, 'wb') as file:
+                print("BSM: Saving similarity matrix in pickle object")
+                pickle.dump(self.matrix, file)
+                print("BSM: Matrix saved")
+                file.close()
+
+    def generateTrainTorchGraph(self, dataset_row, threshold, device, path=None):
         """
         This method generate a pytorch graph modeled by torch_geometric.data.Data class
         :param dataset_row:
@@ -138,8 +138,6 @@ class CosineSimilarityMatrix:
         threshold value from which a node can be considered a neighbor
         :param device:
         device that will compute tensors
-        :param dataset_column:
-        default None. If specified, Dataset with data corresponding to similarity matrix's columns
         :param path:
         default None. If specified, it will be the path in which the graph created will be saved
         :return:
@@ -147,47 +145,101 @@ class CosineSimilarityMatrix:
         """
         feature_data = dataset_row.getFeatureData()
         edge_list = []
-        if self.rowsEqualToColumns:
-            print("GTG: Creating edge dataframe")
-            for rowIndex, row in enumerate(self.matrix):
-                for columnIndex, value in enumerate(row):
-                    if rowIndex > columnIndex:
-                        if value * 100 >= threshold:
-                            edge_list.append([rowIndex, columnIndex, self.matrix[rowIndex][columnIndex]])
-                    else:
-                        break
-                if rowIndex % 100 == 0:
-                    print("GTG: " + str(rowIndex) + " X examples computed")
+        print("GTG: Creating edge dataframe")
+        for rowIndex, row in enumerate(self.matrix):
+            for columnIndex, value in enumerate(row):
+                if rowIndex > columnIndex:
+                    if value * 100 >= threshold:
+                        edge_list.append([rowIndex, columnIndex, self.matrix[rowIndex][columnIndex]])
+                else:
+                    break
+            if rowIndex % 100 == 0:
+                print("GTG: " + str(rowIndex) + " X examples computed")
 
-        else:
-            rows_number = len(feature_data.index)
-            feature_data = pd.concat([feature_data, dataset_column.getFeatureData()], ignore_index=True)
-            print("GTG: Creating edge dataframe")
-            for rowIndex, row in enumerate(self.matrix):
-                for columnIndex, value in enumerate(row):
-                    if rowIndex != columnIndex and value * 100 >= threshold:
-                        edge_list.append([rowIndex, rows_number + columnIndex, self.matrix[rowIndex][columnIndex]])
-                if rowIndex % 100 == 0:
-                    print("GTG: " + str(rowIndex) + " X examples computed")
-
-        print("GTG: Creating torch geometric tensors from data")
+        print("GTG: Creating train torch geometric tensors from data")
         features = torch.tensor(feature_data.values, dtype=torch.float).to(device)
         labels = torch.tensor(dataset_row.getLabelData().values, dtype=torch.long).to(device)
         edge_dataframe = pd.DataFrame(edge_list, columns=['source', 'target', 'weight'])
         edge_index = torch.tensor([edge_dataframe['source'], edge_dataframe['target']], dtype=torch.long).to(device)
         edge_weights = torch.tensor(edge_dataframe['weight'], dtype=torch.float).to(device)
-
-        print("BTG: Creating torch geometric graph from built tensors")
+        torch_train_mask, torch_validation_mask = dataset_row.computeMasks()
+        torch_train_mask = torch_train_mask.to(device)
+        torch_validation_mask = torch_validation_mask.to(device)
+        print("BTG: Creating train torch geometric graph from built tensors")
         graph = Data(x=features, y=labels, edge_index=edge_index, edge_weight=edge_weights,
-                     num_classes=dataset_row.getLabelData().nunique()[0]).to(device)
-
-        print("Graph info:", graph)
+                     num_classes=dataset_row.getLabelData().nunique().iloc[0], num_nodes=len(feature_data)).to(device)
+        graph = graph.coalesce()
+        graph = torch_transform.ToUndirected()(graph)
+        graph.train_mask = torch_train_mask
+        graph.validation_mask = torch_validation_mask
+        print("Train Graph info:", graph)
 
         if path is not None:
             with open(path, 'wb') as file:
-                print("BTG: Saving graph in pickle object at " + path)
+                print("BTG: Saving train graph in pickle object at " + path)
                 pickle.dump(graph, file)
-                print("BTG: Graph saved")
+                print("BTG: Train graph saved")
+                file.close()
+        return graph
+
+
+class CosineSimilarityMatrixTest(CosineSimilarityMatrix):
+    """
+    Test cosine similarity matrix
+    """
+    def computeMatrix(self, rows, columns=None, save_path=None):
+        """
+        This method compute the matrix contained in the class
+        Parameters
+        ----------
+        :param rows:
+        dataSet that will be used as example on matrix's rows
+        :param columns:
+        dataSet that will be used as example on matrix's columns. If this parameter is None, rows_data parameter will be
+        used
+        :param save_path:
+        boolean that specifies fi the matrix will be serialized in a pickle object
+        """
+        if columns is None:
+            raise Exception("In test cosine similarity matrix columns dataframe must not be None")
+        print("BSM: Computing test similarity matrix with shape: " + str(rows.shape[0]) + "," +
+              str(columns.shape[0]))
+        matrix_float64 = cosine_similarity(rows, columns)
+        print("BSM: Reducing test similarity matrix values' size")
+        self.matrix = np.array(matrix_float64, dtype=np.float16)
+        if save_path is not None:
+            with open(save_path, 'wb') as file:
+                print("BSM: Saving test similarity matrix in pickle object")
+                pickle.dump(self.matrix, file)
+                print("BSM: Test matrix saved")
                 file.close()
 
-        return graph
+    def addTestExampleToGraph(self, threshold, train_graph, test_example, test_example_index, device, path=None):
+        """
+        This method add a new test example to an existent input torch_geometric graph
+        :param threshold:
+        threshold value from which a node can be considered a neighbor
+        :param train_graph:
+        torch_geometric graph with train data
+        :param test_example:
+        test example that will be added to the train graph
+        :param test_example_index:
+        index of the test example
+        :param device:
+        device that will compute tensors
+        :param path:
+        default None. If specified, it will be the path in which the graph created will be saved
+        :return:
+        a copy of the train graph with a new test example
+        """
+        edge_list = []
+        print("GTG: Creating edge dataframe")
+        for rowIndex, row in enumerate(self.matrix):
+            similarity = self.matrix[rowIndex][test_example_index]
+            if rowIndex != test_example_index:
+                if similarity * 100 >= threshold:
+                    edge_list.append([rowIndex, test_example_index, self.matrix[rowIndex][test_example_index]])
+            if rowIndex % 100 == 0:
+                print("GTG: " + str(rowIndex) + " X examples computed")
+
+        
