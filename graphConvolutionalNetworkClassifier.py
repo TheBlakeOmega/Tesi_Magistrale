@@ -112,10 +112,10 @@ class GCN(torch.nn.Module):
 
         x = self.conv1(x, edge_index, edge_weights)
         x = torch_functional.relu(x)
-        x = torch_functional.dropout(x, training=self.training, p=0.3)
+        x = torch_functional.dropout(x, p=0.3)
         x = self.conv2(x, edge_index, edge_weights)
         x = torch_functional.relu(x)
-        x = torch_functional.dropout(x, training=self.training, p=0.3)
+        x = torch_functional.dropout(x, p=0.3)
 
         x = self.lin1(x)
         x = torch_functional.relu(x)
