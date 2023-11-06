@@ -61,11 +61,11 @@ class GraphNetwork:
                     val_acc += self._accuracy(out[batch.validation_mask].argmax(dim=1),
                                               batch.y[batch.validation_mask])
 
-            # Print metrics every 10 epochs
+            # Print metrics
             print(f'TRM: Epoch {epoch:>3} | Train Loss: {total_loss / len(data_loader):.3f} '
-                  f'| Train Acc: {acc / len(data_loader) * 100:>6.2f}% | Val Loss: '
+                  f'| Train Acc: {acc / len(data_loader):>6.2f}% | Val Loss: '
                   f'{val_loss / len(data_loader):.3f} | Val Acc: '
-                  f'{val_acc / len(data_loader) * 100:>6.2f}%')
+                  f'{val_acc / len(data_loader):>6.2f}%')
 
             scheduler.step()
 
@@ -109,10 +109,6 @@ class GCN(torch.nn.Module):
         self.lin3 = Linear(64, num_classes)
 
     def forward(self, x, edge_index, edge_weights):
-        # x, edge_index, edge_weights = data.x, data.edge_index, data.edge_weight
-        print(str(x))
-        print(str(edge_index))
-        print(str(edge_weights))
 
         x = self.conv1(x, edge_index, edge_weights)
         x = torch_functional.relu(x)
