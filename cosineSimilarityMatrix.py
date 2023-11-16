@@ -155,7 +155,6 @@ class CosineSimilarityMatrixTrain(CosineSimilarityMatrix):
                     break
             if rowIndex % 100 == 0:
                 print("GTG: " + str(rowIndex) + " X examples computed")
-
         print("GTG: Creating train torch geometric tensors from data")
         features = torch.tensor(feature_data.values, dtype=torch.float).to(device)
         labels = torch.tensor(dataset_row.getLabelData().values, dtype=torch.long).to(device)

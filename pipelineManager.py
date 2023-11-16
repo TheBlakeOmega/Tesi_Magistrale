@@ -1,8 +1,8 @@
 from dataset import Dataset
 from cosineSimilarityMatrix import CosineSimilarityMatrixTrain, CosineSimilarityMatrixTest
 import traceback
-import torch_directml
 import pickle
+import torch
 from graphConvolutionalNetworkClassifier import GraphNetwork
 
 
@@ -91,12 +91,12 @@ class PipeLineManager:
         # train_matrix.buildNeighborCountBoxPlotAndReport(float(self.configuration['minSimilarityValues']))
 
         print("\n COMPUTING TORCH GRAPHS \n")
-        device = torch_directml.device()
+        device = torch.cuda.device(0)
         train_graph_save_path = (self.configuration['pathPytorchGraphs'] + self.configuration['chosenDataset']
                                  + "_train_torch_graph.pkl")
         train_graph = train_matrix.generateTrainTorchGraph(train_dataset,
                                                            float(self.configuration['minSimilarityValues']),
-                                                           'cpu',
+                                                           'cuda',
                                                            path=train_graph_save_path)
         self.result_file.write("Train graph info:" + str(train_graph) + "\n\n")
 
@@ -104,7 +104,7 @@ class PipeLineManager:
         """
         This method runs the pipeline to train and serialize GCN model
         """
-        device = torch_directml.device()
+        device = 'cuda'
         load_path = (self.configuration['pathPytorchGraphs'] + self.configuration['chosenDataset']
                      + "_train_torch_graph.pkl")
         with open(load_path, 'rb') as file:
@@ -115,9 +115,9 @@ class PipeLineManager:
         model = GraphNetwork()
         space = {
             'epochs': 150,
-            'earlyStoppingThresh': 20
+            'earlyStoppingThresh': 200
         }
-        print("Starting GCN training on " + str(torch_directml.device_name(device.index)))
+        print("Starting GCN training on " + torch.cuda.get_device_name(0))
         save_path = self.configuration['pathModels'] + self.configuration['chosenDataset'] + "_trained_GCN.pkl"
-        loss, train_time = model.train(train_graph, space, 'cpu', save_path)
+        loss, train_time = model.train(train_graph, space, 'cuda', save_path)
         self.result_file.write("Trained model result:" + "\nLoss: " + str(loss) + "\nTrain time: " + str(train_time))
