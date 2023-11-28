@@ -18,12 +18,6 @@ Test similarity matrix:
  [ 0.949   0.36    0.9297 ... -0.539  -0.552   0.9185]] 
 Shapes: (8118, 3480)
 
-Number of isolated nodes in train matrix: 786
-MAX NEIGHBORS: 3717
-MIN NEIGHBORS: 0
-MEAN NEIGHBORS: 1455.6193643754618
-STANDARD DEVIATION NEIGHBORS: 1559.428379530125
-
-Train graph info:Data(x=[8118, 40], edge_index=[2, 11816718], y=[8118, 1], edge_weight=[11816718], num_classes=5, num_nodes=8118, train_mask=[8118], validation_mask=[8118])
+Train graph info:Data(x=[8118, 40], edge_index=[2, 38154], y=[8118, 1], edge_weight=[38154], num_classes=5, num_nodes=8118, train_mask=[8118], validation_mask=[8118])
 
 Similarity matrices built successfully.

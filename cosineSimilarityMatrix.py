@@ -7,6 +7,7 @@ from torch_geometric.data import Data
 import pandas as pd
 from abc import ABC, abstractmethod
 import torch_geometric.transforms as torch_transform
+import operator
 
 
 class CosineSimilarityMatrix(ABC):
@@ -129,13 +130,15 @@ class CosineSimilarityMatrixTrain(CosineSimilarityMatrix):
                 print("BSM: Matrix saved")
                 file.close()
 
-    def generateTrainTorchGraph(self, dataset_row, threshold, device, path=None):
+    def generateTrainTorchGraph(self, dataset_row, threshold, max_neighbors, device, path=None):
         """
         This method generate a pytorch graph modeled by torch_geometric.data.Data class
         :param dataset_row:
         Dataset with data corresponding to similarity matrix's rows
         :param threshold:
         threshold value from which a node can be considered a neighbor
+        :param max_neighbors:
+        max number of neighbour that each node can have
         :param device:
         device that will compute tensors
         :param path:
@@ -147,12 +150,11 @@ class CosineSimilarityMatrixTrain(CosineSimilarityMatrix):
         edge_list = []
         print("GTG: Creating edge dataframe")
         for rowIndex, row in enumerate(self.matrix):
-            for columnIndex, value in enumerate(row):
-                if rowIndex > columnIndex:
-                    if value * 100 >= threshold:
-                        edge_list.append([rowIndex, columnIndex, self.matrix[rowIndex][columnIndex]])
-                else:
-                    break
+            indexed_row = list(enumerate(row))
+            top_similarities = sorted(indexed_row, key=operator.itemgetter(1))[-(max_neighbors + 1):]
+            for (columnIndex, similarity) in top_similarities:
+                if rowIndex != columnIndex and similarity * 100 >= threshold:
+                    edge_list.append([rowIndex, columnIndex, similarity])
             if rowIndex % 100 == 0:
                 print("GTG: " + str(rowIndex) + " X examples computed")
         print("GTG: Creating train torch geometric tensors from data")
@@ -168,7 +170,6 @@ class CosineSimilarityMatrixTrain(CosineSimilarityMatrix):
         graph = Data(x=features, y=labels, edge_index=edge_index, edge_weight=edge_weights,
                      num_classes=dataset_row.getLabelData().nunique().iloc[0], num_nodes=len(feature_data)).to(device)
         graph = graph.coalesce()
-        graph = torch_transform.ToUndirected()(graph)
         graph.train_mask = torch_train_mask
         graph.validation_mask = torch_validation_mask
         print("Train Graph info:", graph)
@@ -186,6 +187,7 @@ class CosineSimilarityMatrixTest(CosineSimilarityMatrix):
     """
     Test cosine similarity matrix
     """
+
     def computeMatrix(self, rows, columns=None, save_path=None):
         """
         This method compute the matrix contained in the class
@@ -231,14 +233,29 @@ class CosineSimilarityMatrixTest(CosineSimilarityMatrix):
         :return:
         a copy of the train graph with a new test example
         """
-        edge_list = []
-        print("GTG: Creating edge dataframe")
+        x = train_graph.x.tolist()
+        edge_weights = train_graph.edge_weight.tolist()
+        edge_index = train_graph.edge_index.tolist()
+        new_example_index = len(x)
+        x.append(test_example)
         for rowIndex, row in enumerate(self.matrix):
             similarity = self.matrix[rowIndex][test_example_index]
-            if rowIndex != test_example_index:
-                if similarity * 100 >= threshold:
-                    edge_list.append([rowIndex, test_example_index, self.matrix[rowIndex][test_example_index]])
-            if rowIndex % 100 == 0:
-                print("GTG: " + str(rowIndex) + " X examples computed")
+            if similarity * 100 >= threshold:
+                edge_weights.extend([similarity, similarity])
+                edge_index[0].extend([rowIndex, new_example_index])
+                edge_index[1].extend([new_example_index, rowIndex])
+        x = torch.tensor(x, dtype=torch.float).to(device)
+        edge_index = torch.tensor(edge_index, dtype=torch.long).to(device)
+        edge_weights = torch.tensor(edge_weights, dtype=torch.float).to(device)
 
-        
+        test_graph = Data(x=x, y=train_graph.y, edge_index=edge_index, edge_weight=edge_weights,
+                          num_classes=train_graph.num_classes, num_nodes=(train_graph.num_nodes + 1)).to(device)
+
+        if path is not None:
+            with open(path, 'wb') as file:
+                print("BTG: Saving test graph in pickle object at " + path)
+                pickle.dump(test_graph, file)
+                print("BTG: Test graph saved")
+                file.close()
+
+        return test_graph

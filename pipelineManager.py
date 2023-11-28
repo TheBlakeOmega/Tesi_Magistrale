@@ -4,6 +4,10 @@ import traceback
 import pickle
 import torch
 from graphConvolutionalNetworkClassifier import GraphNetwork
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay, classification_report
+import matplotlib.pyplot as plt
+import numpy as np
+from datetime import datetime
 
 
 class PipeLineManager:
@@ -28,6 +32,7 @@ class PipeLineManager:
         self.ds_configuration = dataset_configuration
         self.chosen_pipeline = chosen_pipeline
         self.result_file = result_file
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     def runPipeline(self):
         """
@@ -49,6 +54,22 @@ class PipeLineManager:
             except Exception as e:
                 traceback.print_exc()
                 raise Exception("Error during GCN train")
+        elif self.chosen_pipeline == 'COMPUTE_EVALUATION_METRICS_TRAIN_VALIDATION':
+            try:
+                self._computeEvaluationMetricsOnTrainAndValidationSet()
+                print("Evaluation metrics computed successfully.")
+                self.result_file.write("Evaluation metrics computed successfully.")
+            except Exception as e:
+                traceback.print_exc()
+                raise Exception("Error during evaluation metrics computation")
+        elif self.chosen_pipeline == 'TEST_GCN':
+            try:
+                self._testGraphConvolutionalNetwork()
+                print("GCN tested successfully.")
+                self.result_file.write("GCN tested successfully.")
+            except Exception as e:
+                traceback.print_exc()
+                raise Exception("Error during GCN test")
 
     def _buildGraph(self):
         """
@@ -91,12 +112,12 @@ class PipeLineManager:
         # train_matrix.buildNeighborCountBoxPlotAndReport(float(self.configuration['minSimilarityValues']))
 
         print("\n COMPUTING TORCH GRAPHS \n")
-        device = torch.cuda.device(0)
         train_graph_save_path = (self.configuration['pathPytorchGraphs'] + self.configuration['chosenDataset']
-                                 + "_train_torch_graph.pkl")
+                                 + "_" + self.configuration['maxNeighbours'] + "_neighbors_train_torch_graph.pkl")
         train_graph = train_matrix.generateTrainTorchGraph(train_dataset,
                                                            float(self.configuration['minSimilarityValues']),
-                                                           'cuda',
+                                                           int(self.configuration['maxNeighbours']),
+                                                           self.device,
                                                            path=train_graph_save_path)
         self.result_file.write("Train graph info:" + str(train_graph) + "\n\n")
 
@@ -104,20 +125,141 @@ class PipeLineManager:
         """
         This method runs the pipeline to train and serialize GCN model
         """
-        device = 'cuda'
         load_path = (self.configuration['pathPytorchGraphs'] + self.configuration['chosenDataset']
-                     + "_train_torch_graph.pkl")
+                     + "_" + self.configuration['maxNeighbours'] + "_neighbors_train_torch_graph.pkl")
         with open(load_path, 'rb') as file:
-            print("BTG: Loading train graph from " + load_path)
+            print("TGCN: Loading train graph from " + load_path)
             train_graph = pickle.load(file)
-            print("BTG: Train graph loaded")
+            print("TGCN: Train graph loaded")
             file.close()
         model = GraphNetwork()
         space = {
-            'epochs': 150,
+            'epochs': 200,
             'earlyStoppingThresh': 200
         }
-        print("Starting GCN training on " + torch.cuda.get_device_name(0))
-        save_path = self.configuration['pathModels'] + self.configuration['chosenDataset'] + "_trained_GCN.pkl"
-        loss, train_time = model.train(train_graph, space, 'cuda', save_path)
-        self.result_file.write("Trained model result:" + "\nLoss: " + str(loss) + "\nTrain time: " + str(train_time))
+        print("Starting GCN training on " + torch.cuda.get_device_name(0) + " " + str(self.device))
+        save_path = (self.configuration['pathModels'] + self.configuration['chosenDataset']
+                     + "_" + self.configuration['maxNeighbours'] + "_neighbors_trained_GCN.pkl")
+        loss, train_time = model.train(train_graph, space, self.device, save_path)
+        self.result_file.write("Trained model result:" + "\nLoss: " + str(loss) + "\nTrain time: " + str(train_time) +
+                               "\n")
+
+    def _testGraphConvolutionalNetwork(self):
+        """
+        This method runs the pipeline to compute evaluation metrics on test set
+        """
+        print("TeGCN: Loading test dataset from " + self.ds_configuration['pathTestDataset'])
+        test_dataset = Dataset(self.ds_configuration['pathTestDataset'],
+                               self.ds_configuration['labelColumnName'])
+        print("TeGCN: Dataset Loaded")
+        print("TeGCN: Loading test similarity matrix from " + self.configuration['pathSimilarityMatrices'] +
+              self.configuration['chosenDataset'] + "_test_similarity_matrix.pkl")
+        test_matrix = CosineSimilarityMatrixTest()
+        test_matrix.loadMatrix(self.configuration['pathSimilarityMatrices'] + self.configuration['chosenDataset'] +
+                               "_test_similarity_matrix.pkl")
+        print("TeGCN: Similarity Matrix Loaded")
+        graph_load_path = (self.configuration['pathPytorchGraphs'] + self.configuration['chosenDataset']
+                           + "_" + self.configuration['maxNeighbours'] + "_neighbors_train_torch_graph.pkl")
+        with open(graph_load_path, 'rb') as file:
+            print("TeGCN: Loading train graph from " + graph_load_path)
+            train_graph = pickle.load(file)
+            print(train_graph)
+            print("TeGCN: Train graph loaded")
+            file.close()
+        print("TeGCN: Loading model from " + self.configuration['pathModels'] + self.configuration['chosenDataset'] +
+              "_trained_GCN.pkl")
+        model = GraphNetwork()
+        model.loadModel(self.configuration['pathModels'] + self.configuration['chosenDataset']
+                        + "_" + self.configuration['maxNeighbours'] + "_neighbors_trained_GCN.pkl",
+                        self.device)
+        print("TeGCN: Model Loaded")
+
+        predictions = []
+        counter = 1
+        start_test_time = np.datetime64(datetime.now())
+        for test_example_index, test_example in test_dataset.getFeatureData().iterrows():
+            test_graph = test_matrix.addTestExampleToGraph(float(self.configuration['minSimilarityValues']),
+                                                           train_graph, test_example, test_example_index, self.device)
+            test_mask = [False for i in range(len(test_graph.x.tolist()))]
+            test_mask[-1] = True
+            test_mask = torch.tensor(test_mask, dtype=torch.bool)
+            example_prediction = model.test(test_graph, self.device, test_mask).tolist()
+            predictions.extend(example_prediction)
+
+            if counter % 10 == 0:
+                print("TeGCN: " + str(counter) + " examples computed")
+            counter += 1
+        end_test_time = np.datetime64(datetime.now())
+
+        labels = list(set(test_dataset.getLabelData()[self.ds_configuration['labelColumnName']]))
+        print("TeGCN: Computing confusion matrix")
+        test_confusion_matrix = confusion_matrix(
+            test_dataset.getLabelData()[self.ds_configuration['labelColumnName']],
+            predictions, labels=labels)
+        print("TeGCN: Computing classification report")
+        test_classification_report = classification_report(
+            test_dataset.getLabelData()[self.ds_configuration['labelColumnName']], predictions, digits=3)
+        self.result_file.write("Test confusion matrix:\n")
+        self.result_file.write(str(test_confusion_matrix) + "\n")
+        self.result_file.write("Test classification report:\n")
+        self.result_file.write(str(test_classification_report) + "\n")
+        self.result_file.write("Test computation time:\n")
+        self.result_file.write(str(end_test_time - start_test_time) + "\n")
+        test_confusion_matrix_plot = ConfusionMatrixDisplay(test_confusion_matrix, display_labels=labels)
+        test_confusion_matrix_plot.plot()
+        plt.title("Test Confusion Matrix " + self.configuration['chosenDataset'])
+        plt.savefig(self.configuration['chosenDataset'] + "_test_confusion_matrix.png")
+        plt.close()
+
+    def _computeEvaluationMetricsOnTrainAndValidationSet(self):
+        """
+        This method runs the pipeline to compute evaluation metrics on train and validation set
+        """
+        graph_load_path = (self.configuration['pathPytorchGraphs'] + self.configuration['chosenDataset']
+                           + "_" + self.configuration['maxNeighbours'] + "_neighbors_train_torch_graph.pkl")
+        with open(graph_load_path, 'rb') as file:
+            print("CCM: Loading train graph from " + graph_load_path)
+            input_graph = pickle.load(file)
+            print(input_graph)
+            print("CCM: Train graph loaded")
+            file.close()
+        model = GraphNetwork()
+        model.loadModel(self.configuration['pathModels'] + self.configuration['chosenDataset'] + "_trained_GCN.pkl",
+                        self.device)
+        print("CCM: Computing predictions")
+        predictions = model.test(input_graph, self.device)
+        print("CCM: Computing confusion matrices")
+        labels = list(set(input_graph.y.squeeze().tolist()))
+        train_confusion_matrix = confusion_matrix(input_graph.y[input_graph.train_mask.to(self.device)].squeeze()
+                                                  .tolist(), predictions[input_graph.train_mask.to(self.device)]
+                                                  .tolist(), labels=labels)
+        validation_confusion_matrix = confusion_matrix(input_graph.y[input_graph.validation_mask.to(self.device)]
+                                                       .squeeze().tolist(), predictions[input_graph.validation_mask
+                                                       .to(self.device)].tolist(), labels=labels)
+        train_classification_report = classification_report(
+            input_graph.y[input_graph.train_mask.to(self.device)].squeeze()
+            .tolist(), predictions[input_graph.train_mask.to(self.device)]
+            .tolist(), digits=3)
+        validation_classification_report = classification_report(
+            input_graph.y[input_graph.validation_mask.to(self.device)].squeeze()
+            .tolist(), predictions[input_graph.validation_mask.to(self.device)]
+            .tolist(), digits=3)
+
+        self.result_file.write("Train confusion matrix:\n")
+        self.result_file.write(str(train_confusion_matrix) + "\n")
+        self.result_file.write("Train classification report:\n")
+        self.result_file.write(str(train_classification_report) + "\n")
+        self.result_file.write("Validation confusion matrix:\n")
+        self.result_file.write(str(validation_confusion_matrix) + "\n")
+        self.result_file.write("Validation classification report:\n")
+        self.result_file.write(str(validation_classification_report) + "\n")
+        train_confusion_matrix_plot = ConfusionMatrixDisplay(train_confusion_matrix, display_labels=labels)
+        train_confusion_matrix_plot.plot()
+        plt.title("Train Confusion Matrix " + self.configuration['chosenDataset'])
+        plt.savefig(self.configuration['chosenDataset'] + "_train_confusion_matrix.png")
+        plt.close()
+        validation_confusion_matrix_plot = ConfusionMatrixDisplay(validation_confusion_matrix, display_labels=labels)
+        validation_confusion_matrix_plot.plot()
+        plt.title("Validation Confusion Matrix " + self.configuration['chosenDataset'])
+        plt.savefig(self.configuration['chosenDataset'] + "_validation_confusion_matrix.png")
+        plt.close()
