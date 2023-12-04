@@ -1,8 +1,10 @@
 import configparser
 import numpy as np
 from pipelineManager import PipeLineManager
+import random
 
 np.random.seed(12)
+random.seed(12)
 
 
 def datasetException(dataset_name):
@@ -26,9 +28,10 @@ if __name__ == '__main__':
     dataset = datasetException(configuration['chosenDataset'])
     dsConf = config[dataset]
 
-    with open("results/result_" + dataset + "_" + configuration['minSimilarityValues'] + "_"
+    with open("results/result_" + dataset + "_" +
+              configuration['convolutionalLayersNumber'] + "_conv_"
+              + configuration['maxNeighbours'] + "_neighbors_"
               + configuration['chosenPipeline'] + ".txt", "w") as result_file:
-
         pManager = PipeLineManager(configuration, dsConf, configuration['chosenPipeline'], result_file)
         pManager.runPipeline()
 

@@ -1,14 +1,19 @@
 import torch
 from torch.utils.data import TensorDataset, RandomSampler
 from torch_geometric.nn import GCNConv
-from torch.nn import Linear
+from torch.nn import Linear, Module, ModuleList
 import torch.nn.functional as torch_functional
 from torch_geometric.loader import DataLoader
 from torch.nn import CrossEntropyLoss
 import pickle
+from hyperopt import STATUS_OK
+from sklearn.metrics import accuracy_score
 import numpy as np
 from datetime import datetime
-from sklearn.metrics import accuracy_score
+import csv
+
+SavedParameters = []
+best_loss = np.inf
 
 
 class GraphNetwork:
@@ -16,12 +21,12 @@ class GraphNetwork:
     def __init__(self):
         self.model = None
 
-    def train(self, input_graph, args, device, save_path=None):
+    def train(self, input_graph, params, device, save_path=None):
         """
-        Train model with input torch_geometric graph and inputs in args
+        Train model with input torch_geometric graph and inputs in params
         :param input_graph:
         input graph with train data
-        :param args:
+        :param params:
         parameters used during train
         :param device:
         device that will compute tensors
@@ -29,21 +34,24 @@ class GraphNetwork:
         default None. If specified, it will be the path in which the trained graph will be saved
         """
 
-        start_train_time = np.datetime64(datetime.now())
         data = input_graph.to(device)
-        self.model = GCN(data.num_node_features, data.num_classes).to(device)
-        optimizer = torch.optim.Adam(self.model.parameters())
+        dropouts = []
+        for i in range(params['conv_layers']):
+            dropouts.append(params['dropout_' + str(i + 1)])
+        self.model = GCN(data.num_node_features, data.num_classes,
+                         conv_layers_number=params['conv_layers'],
+                         dropouts=dropouts).to(device)
+        optimizer = torch.optim.Adam(self.model.parameters(), lr=params['learning_rate'])
         scheduler = torch.optim.lr_scheduler.LinearLR(optimizer, start_factor=1.0, end_factor=0.5, total_iters=300)
-        data_loader = self._getDataLoader(data, data.train_mask, batch_size=64)
+        data_loader = self._getDataLoader(data, data.train_mask, batch_size=params['batch_size'])
         print("TRM: DataLoader created with " + str(len(data_loader)) + " batches")
 
         criterion = CrossEntropyLoss()
-        last_loss = 10
+        last_loss = np.inf
         worst_loss_times = 0
-        for epoch in range(args['epochs']):
+        for epoch in range(params['epochs']):
 
             # Train on batches
-            loss = 0
             acc = 0
             val_loss = 0
             val_acc = 0
@@ -79,15 +87,15 @@ class GraphNetwork:
 
             scheduler.step()
 
-            if loss > last_loss:
+            if total_loss / len(data_loader) > last_loss:
                 worst_loss_times += 1
+            else:
+                worst_loss_times = 0
 
-            last_loss = loss
+            last_loss = total_loss / len(data_loader)
 
-            if worst_loss_times == args['earlyStoppingThresh']:
+            if worst_loss_times == params['earlyStoppingThresh']:
                 break
-
-        end_train_time = np.datetime64(datetime.now())
 
         if save_path is not None:
             with open(save_path, 'wb') as file:
@@ -96,7 +104,65 @@ class GraphNetwork:
                 print("TRM: Model saved")
                 file.close()
 
-        return total_loss / len(data_loader), end_train_time - start_train_time
+        scores = {
+            'train_loss': last_loss,
+            'train_accuracy': acc / len(data_loader),
+            'validation_loss': val_loss,
+            'validation_accuracy': val_acc,
+            'epochs': epoch + 1
+        }
+
+        return scores
+
+    def optimizeParameters(self, params):
+        """
+        Optimize train's parameters in params
+        :param params:
+        parameters used during train that will be optimized
+        :return:
+        A dictionary containing the loss of last train
+        """
+
+        global SavedParameters
+        global best_loss
+
+        start_train_time = np.datetime64(datetime.now())
+        outs = self.train(params['input_graph'], params, params['device'])
+        end_train_time = np.datetime64(datetime.now())
+
+        torch.cuda.empty_cache()
+
+        SavedParameters.append(outs)
+        SavedParameters[-1].update({"learning_rate": params["learning_rate"],
+                                    "train_time": str(end_train_time - start_train_time),
+                                    "batch_size": params["batch_size"], "conv_layers_number": params["conv_layers"]})
+        for i in range(params['conv_layers']):
+            SavedParameters[-1].update({("dropout_" + str(i + 1)): params["dropout_" + str(i + 1)]})
+
+        if SavedParameters[-1]["validation_loss"] < best_loss:
+            if params['save_model_path'] is not None:
+                print("OP: New saved model:" + str(SavedParameters[-1]))
+                with open(params['save_model_path'], 'wb') as file:
+                    print("OP: Saving model in pickle object")
+                    pickle.dump(self.model, file)
+                    print("OP: Model saved")
+                    file.close()
+            best_loss = SavedParameters[-1]["validation_loss"]
+
+        SavedParameters = sorted(SavedParameters, key=lambda i: i['validation_loss'], reverse=False)
+
+        with open(params['save_results_path'], 'w', newline='') as csvfile:
+            writer = csv.DictWriter(csvfile, fieldnames=SavedParameters[0].keys())
+            writer.writeheader()
+            writer.writerows(SavedParameters)
+            csvfile.close()
+
+        scores = {
+            'loss': outs['validation_loss'],
+            'status': STATUS_OK
+        }
+
+        return scores
 
     def test(self, input_graph, device, mask=None):
         """
@@ -150,30 +216,34 @@ class GraphNetwork:
         return data_loader
 
 
-class GCN(torch.nn.Module):
+class GCN(Module):
     """
     Class to obtain a GCN model for homogeneous graphs
     """
 
-    def __init__(self, num_node_features, num_classes):
+    def __init__(self, num_node_features, num_classes, conv_layers_number, dropouts):
         super().__init__()
         torch.manual_seed(12)
-        self.conv1 = GCNConv(num_node_features, 512)
-        self.conv2 = GCNConv(512, 256)
+        self.dropouts = dropouts
 
-        self.lin1 = Linear(256, 128)
-        self.lin2 = Linear(128, 64)
-        self.lin3 = Linear(64, num_classes)
+        channels = 512
+        self.conv_layers = ModuleList([])
+        self.conv_layers.append(GCNConv(num_node_features, channels))
+        for i in range(conv_layers_number - 1):
+            self.conv_layers.append(GCNConv(int(channels), int(channels / 2)))
+            channels /= 2
+
+        self.lin1 = Linear(int(channels), int(channels / 2))
+        self.lin2 = Linear(int(channels / 2), int(channels / 4))
+        self.lin3 = Linear(int(channels / 4), num_classes)
 
     def forward(self, data, batch_node_indexes=None):
         x, edge_index, edge_weights = data.x, data.edge_index, data.edge_weight
 
-        x = self.conv1(x, edge_index, edge_weights)
-        x = torch_functional.relu(x)
-        x = torch_functional.dropout(x, p=0.3)
-        x = self.conv2(x, edge_index, edge_weights)
-        x = torch_functional.relu(x)
-        x = torch_functional.dropout(x, p=0.3)
+        for i in range(len(self.conv_layers)):
+            x = self.conv_layers[i](x, edge_index, edge_weights)
+            x = torch_functional.relu(x)
+            x = torch_functional.dropout(x, p=self.dropouts[i])
 
         x = self.lin1(x)
         x = torch_functional.relu(x)

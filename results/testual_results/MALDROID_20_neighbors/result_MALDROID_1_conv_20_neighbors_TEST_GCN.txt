@@ -1,0 +1,22 @@
+Test confusion matrix:
+[[ 409   16   12   68   34]
+ [  33  141   16  149   37]
+ [  11   16  116  438   49]
+ [   2    2   17 1141    9]
+ [  28   22   25  246  443]]
+Test classification report:
+              precision    recall  f1-score   support
+
+           0      0.847     0.759     0.800       539
+           1      0.716     0.375     0.492       376
+           2      0.624     0.184     0.284       630
+           3      0.559     0.974     0.710      1171
+           4      0.774     0.580     0.663       764
+
+    accuracy                          0.647      3480
+   macro avg      0.704     0.574     0.590      3480
+weighted avg      0.679     0.647     0.613      3480
+
+Test computation time:
+310084834 microseconds
+GCN tested successfully.

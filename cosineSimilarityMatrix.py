@@ -151,7 +151,7 @@ class CosineSimilarityMatrixTrain(CosineSimilarityMatrix):
         print("GTG: Creating edge dataframe")
         for rowIndex, row in enumerate(self.matrix):
             indexed_row = list(enumerate(row))
-            top_similarities = sorted(indexed_row, key=operator.itemgetter(1))[-(max_neighbors + 1):]
+            top_similarities = sorted(indexed_row, key=operator.itemgetter(1))[-(max_neighbors + 1):] # +1 perchè il nodo stesso è considerato vicino
             for (columnIndex, similarity) in top_similarities:
                 if rowIndex != columnIndex and similarity * 100 >= threshold:
                     edge_list.append([rowIndex, columnIndex, similarity])
