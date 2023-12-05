@@ -193,7 +193,8 @@ class PipeLineManager:
         start_test_time = np.datetime64(datetime.now())
         for test_example_index, test_example in test_dataset.getFeatureData().iterrows():
             test_graph = test_matrix.addTestExampleToGraph(float(self.configuration['minSimilarityValues']),
-                                                           train_graph, test_example, test_example_index, self.device)
+                                                           train_graph, test_example, test_example_index,
+                                                           int(self.configuration['maxNeighbours']), self.device)
             test_mask = [False for i in range(len(test_graph.x.tolist()))]
             test_mask[-1] = True
             test_mask = torch.tensor(test_mask, dtype=torch.bool)

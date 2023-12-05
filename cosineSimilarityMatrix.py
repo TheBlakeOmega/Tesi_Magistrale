@@ -8,6 +8,7 @@ import pandas as pd
 from abc import ABC, abstractmethod
 import torch_geometric.transforms as torch_transform
 import operator
+import heapq
 
 
 class CosineSimilarityMatrix(ABC):
@@ -105,6 +106,7 @@ class CosineSimilarityMatrixTrain(CosineSimilarityMatrix):
     """
     Train cosine similarity matrix
     """
+
     def computeMatrix(self, rows, columns=None, save_path=None):
         """
         This method compute the matrix contained in the class
@@ -151,9 +153,10 @@ class CosineSimilarityMatrixTrain(CosineSimilarityMatrix):
         print("GTG: Creating edge dataframe")
         for rowIndex, row in enumerate(self.matrix):
             indexed_row = list(enumerate(row))
-            top_similarities = sorted(indexed_row, key=operator.itemgetter(1))[-(max_neighbors + 1):] # +1 perchè il nodo stesso è considerato vicino
+            top_similarities = sorted(indexed_row, key=operator.itemgetter(1))[
+                               -(max_neighbors + 1):]  # +1 perchè il nodo stesso è considerato vicino
             for (columnIndex, similarity) in top_similarities:
-                if rowIndex != columnIndex and similarity * 100 >= threshold:
+                if rowIndex != columnIndex and similarity >= threshold:
                     edge_list.append([rowIndex, columnIndex, similarity])
             if rowIndex % 100 == 0:
                 print("GTG: " + str(rowIndex) + " X examples computed")
@@ -215,7 +218,8 @@ class CosineSimilarityMatrixTest(CosineSimilarityMatrix):
                 print("BSM: Test matrix saved")
                 file.close()
 
-    def addTestExampleToGraph(self, threshold, train_graph, test_example, test_example_index, device, path=None):
+    def addTestExampleToGraph(self, threshold, train_graph, test_example, test_example_index, max_neighbors,
+                              device, path=None):
         """
         This method add a new test example to an existent input torch_geometric graph
         :param threshold:
@@ -226,6 +230,8 @@ class CosineSimilarityMatrixTest(CosineSimilarityMatrix):
         test example that will be added to the train graph
         :param test_example_index:
         index of the test example
+        :param max_neighbors:
+        max number of neighbour that each node can have
         :param device:
         device that will compute tensors
         :param path:
@@ -238,12 +244,34 @@ class CosineSimilarityMatrixTest(CosineSimilarityMatrix):
         edge_index = train_graph.edge_index.tolist()
         new_example_index = len(x)
         x.append(test_example)
-        for rowIndex, row in enumerate(self.matrix):
-            similarity = self.matrix[rowIndex][test_example_index]
-            if similarity * 100 >= threshold:
-                edge_weights.extend([similarity, similarity])
-                edge_index[0].extend([rowIndex, new_example_index])
-                edge_index[1].extend([new_example_index, rowIndex])
+
+        similarities = list(enumerate([row[test_example_index] for row in self.matrix]))
+        for (rowIndex, similarity) in heapq.nlargest(max_neighbors, similarities, key=lambda t: t[1]):
+            if similarity >= threshold:
+                edge_weights.extend([similarity])
+                edge_index[0].extend([new_example_index])
+                edge_index[1].extend([rowIndex])
+        for (rowIndex, similarity) in [pair for pair in similarities if pair[1] >= threshold]:
+            outing_edges = 0
+            min_similarity = 1
+            min_similarity_index = 0
+            for edge_idx, node_index in enumerate(edge_index[0]):
+                if node_index == rowIndex:
+                    outing_edges += 1
+                    if min_similarity < edge_weights[edge_idx]:
+                        min_similarity = edge_weights[edge_idx]
+                        min_similarity_index = edge_idx
+                    if outing_edges == max_neighbors:
+                        break
+            if outing_edges < max_neighbors:
+                edge_weights.extend([similarity])
+                edge_index[0].extend([rowIndex])
+                edge_index[1].extend([new_example_index])
+            elif min_similarity < similarity:
+                edge_weights[min_similarity_index] = similarity
+                edge_index[0][min_similarity_index] = rowIndex
+                edge_index[1][min_similarity_index] = new_example_index
+
         x = torch.tensor(x, dtype=torch.float).to(device)
         edge_index = torch.tensor(edge_index, dtype=torch.long).to(device)
         edge_weights = torch.tensor(edge_weights, dtype=torch.float).to(device)
