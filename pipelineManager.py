@@ -122,6 +122,7 @@ class PipeLineManager:
 
         print("\n COMPUTING TORCH GRAPHS \n")
         train_graph_save_path = (self.configuration['pathPytorchGraphs'] + self.configuration['chosenDataset']
+                                 + "_" + self.configuration['minSimilarityValues'] + "_similarity_"
                                  + "_" + self.configuration['maxNeighbours'] + "_neighbors_train_torch_graph.pkl")
         train_graph = train_matrix.generateTrainTorchGraph(train_dataset,
                                                            float(self.configuration['minSimilarityValues']),
@@ -135,6 +136,7 @@ class PipeLineManager:
         This method runs the pipeline to train and serialize GCN model
         """
         load_path = (self.configuration['pathPytorchGraphs'] + self.configuration['chosenDataset']
+                     + "_" + self.configuration['minSimilarityValues'] + "_similarity_"
                      + "_" + self.configuration['maxNeighbours'] + "_neighbors_train_torch_graph.pkl")
         with open(load_path, 'rb') as file:
             print("TGCN: Loading train graph from " + load_path)
@@ -173,6 +175,7 @@ class PipeLineManager:
                                "_test_similarity_matrix.pkl")
         print("TeGCN: Similarity Matrix Loaded")
         graph_load_path = (self.configuration['pathPytorchGraphs'] + self.configuration['chosenDataset']
+                           + "_" + self.configuration['minSimilarityValues'] + "_similarity_"
                            + "_" + self.configuration['maxNeighbours'] + "_neighbors_train_torch_graph.pkl")
         with open(graph_load_path, 'rb') as file:
             print("TeGCN: Loading train graph from " + graph_load_path)
@@ -236,6 +239,7 @@ class PipeLineManager:
         This method runs the pipeline to compute evaluation metrics on train and validation set
         """
         graph_load_path = (self.configuration['pathPytorchGraphs'] + self.configuration['chosenDataset']
+                           + "_" + self.configuration['minSimilarityValues'] + "_similarity_"
                            + "_" + self.configuration['maxNeighbours'] + "_neighbors_train_torch_graph.pkl")
         with open(graph_load_path, 'rb') as file:
             print("CCM: Loading train graph from " + graph_load_path)
@@ -298,6 +302,7 @@ class PipeLineManager:
         This method runs the pipeline to optimize train's parameters
         """
         load_path = (self.configuration['pathPytorchGraphs'] + self.configuration['chosenDataset']
+                     + "_" + self.configuration['minSimilarityValues'] + "_similarity_"
                      + "_" + self.configuration['maxNeighbours'] + "_neighbors_train_torch_graph.pkl")
         with open(load_path, 'rb') as file:
             print("OGCN: Loading train graph from " + load_path)
