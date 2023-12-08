@@ -30,6 +30,7 @@ if __name__ == '__main__':
 
     with open("results/result_" + dataset + "_" +
               configuration['convolutionalLayersNumber'] + "_conv_"
+              + configuration['minSimilarityValues'] + "_similarity_"
               + configuration['maxNeighbours'] + "_neighbors_"
               + configuration['chosenPipeline'] + ".txt", "w") as result_file:
         pManager = PipeLineManager(configuration, dsConf, configuration['chosenPipeline'], result_file)

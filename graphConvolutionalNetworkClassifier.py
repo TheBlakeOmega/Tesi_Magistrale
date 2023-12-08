@@ -1,7 +1,7 @@
 import torch
 from torch.utils.data import TensorDataset, RandomSampler
-from torch_geometric.nn import GCNConv
-from torch.nn import Linear, Module, ModuleList
+from torch_geometric.nn import GCNConv, Linear
+from torch.nn import Module, ModuleList
 import torch.nn.functional as torch_functional
 from torch_geometric.loader import DataLoader
 from torch.nn import CrossEntropyLoss
@@ -11,9 +11,11 @@ from sklearn.metrics import accuracy_score
 import numpy as np
 from datetime import datetime
 import csv
+from torch.nn.init import xavier_uniform
 
 SavedParameters = []
 best_loss = np.inf
+best_model = None
 
 
 class GraphNetwork:
@@ -47,7 +49,10 @@ class GraphNetwork:
         print("TRM: DataLoader created with " + str(len(data_loader)) + " batches")
 
         criterion = CrossEntropyLoss()
-        last_loss = np.inf
+        best_val_loss = np.inf
+        best_val_acc = np.inf
+        best_train_loss = 0
+        best_train_acc = 0
         worst_loss_times = 0
         for epoch in range(params['epochs']):
 
@@ -87,15 +92,22 @@ class GraphNetwork:
 
             scheduler.step()
 
-            if total_loss / len(data_loader) > last_loss:
+            if round(val_loss, 4) >= best_val_loss:
                 worst_loss_times += 1
             else:
                 worst_loss_times = 0
-
-            last_loss = total_loss / len(data_loader)
+                best_val_loss = round(val_loss, 4)
+                best_val_acc = round(val_acc, 4)
+                best_train_loss = round(total_loss / len(data_loader), 4)
+                best_train_acc = round(acc / len(data_loader), 4)
+                # save best model's weights
+                torch.save(self.model.state_dict(), 'tmp/temp_best_model_state_dict.pt')
 
             if worst_loss_times == params['earlyStoppingThresh']:
                 break
+
+        # reload best model's weights
+        self.model.load_state_dict(torch.load('tmp/temp_best_model_state_dict.pt', map_location=torch.device(device)))
 
         if save_path is not None:
             with open(save_path, 'wb') as file:
@@ -105,10 +117,10 @@ class GraphNetwork:
                 file.close()
 
         scores = {
-            'train_loss': last_loss,
-            'train_accuracy': acc / len(data_loader),
-            'validation_loss': val_loss,
-            'validation_accuracy': val_acc,
+            'train_loss': best_train_loss,
+            'train_accuracy': best_train_acc,
+            'validation_loss': best_val_loss,
+            'validation_accuracy': best_val_acc,
             'epochs': epoch + 1
         }
 
@@ -233,9 +245,9 @@ class GCN(Module):
             self.conv_layers.append(GCNConv(int(channels), int(channels / 2)))
             channels /= 2
 
-        self.lin1 = Linear(int(channels), int(channels / 2))
-        self.lin2 = Linear(int(channels / 2), int(channels / 4))
-        self.lin3 = Linear(int(channels / 4), num_classes)
+        self.lin1 = Linear(int(channels), int(channels / 2), weight_initializer="glorot")
+        self.lin2 = Linear(int(channels / 2), int(channels / 4), weight_initializer="glorot")
+        self.lin3 = Linear(int(channels / 4), num_classes, weight_initializer="glorot")
 
     def forward(self, data, batch_node_indexes=None):
         x, edge_index, edge_weights = data.x, data.edge_index, data.edge_weight

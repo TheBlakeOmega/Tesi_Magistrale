@@ -147,7 +147,8 @@ class PipeLineManager:
             'earlyStoppingThresh': 200
         }
         print("Starting GCN training on " + torch.cuda.get_device_name(0) + " " + str(self.device))
-        save_path = (self.configuration['pathModels'] + self.configuration['chosenDataset'] + "_" +
+        save_path = (self.configuration['pathModels'] + self.configuration['chosenDataset'] +
+                     "_" + self.configuration['minSimilarityValues'] + "_similarity_" +
                      self.configuration['convolutionalLayersNumber'] + "_conv_"
                      + self.configuration['maxNeighbours'] + "_neighbors_trained_GCN.pkl")
         start_train_time = np.datetime64(datetime.now())
@@ -182,7 +183,8 @@ class PipeLineManager:
         print("TeGCN: Loading model from " + self.configuration['pathModels'] + self.configuration['chosenDataset'] +
               "_trained_GCN.pkl")
         model = GraphNetwork()
-        model.loadModel(self.configuration['pathModels'] + self.configuration['chosenDataset'] + "_" +
+        model.loadModel(self.configuration['pathModels'] + self.configuration['chosenDataset'] +
+                        "_" + self.configuration['minSimilarityValues'] + "_similarity_" +
                         self.configuration['convolutionalLayersNumber'] + "_conv_"
                         + self.configuration['maxNeighbours'] + "_neighbors_trained_GCN.pkl",
                         self.device)
@@ -224,8 +226,9 @@ class PipeLineManager:
         test_confusion_matrix_plot.plot()
         plt.title("Test Confusion Matrix " + self.configuration['chosenDataset'])
         plt.savefig(self.configuration['chosenDataset'] + "_" +
-                    self.configuration['convolutionalLayersNumber'] + "_conv_"
-                    + self.configuration['maxNeighbours'] + "_neighbors_test_confusion_matrix.png")
+                    self.configuration['minSimilarityValues'] + "_similarity_" +
+                    self.configuration['convolutionalLayersNumber'] + "_conv_" +
+                    self.configuration['maxNeighbours'] + "_neighbors_test_confusion_matrix.png")
         plt.close()
 
     def _computeEvaluationMetricsOnTrainAndValidationSet(self):
@@ -241,7 +244,8 @@ class PipeLineManager:
             print("CCM: Train graph loaded")
             file.close()
         model = GraphNetwork()
-        model.loadModel(self.configuration['pathModels'] + self.configuration['chosenDataset'] + "_" +
+        model.loadModel(self.configuration['pathModels'] + self.configuration['chosenDataset'] +
+                        "_" + self.configuration['minSimilarityValues'] + "_similarity_" +
                         self.configuration['convolutionalLayersNumber'] + "_conv_"
                         + self.configuration['maxNeighbours'] + "_neighbors_trained_GCN.pkl",
                         self.device)
@@ -276,15 +280,17 @@ class PipeLineManager:
         train_confusion_matrix_plot.plot()
         plt.title("Train Confusion Matrix " + self.configuration['chosenDataset'])
         plt.savefig(self.configuration['chosenDataset'] + "_" +
-                    self.configuration['convolutionalLayersNumber'] + "_conv_"
-                    + self.configuration['maxNeighbours'] + "_neighbors_train_confusion_matrix.png")
+                    self.configuration['minSimilarityValues'] + "_similarity_" +
+                    self.configuration['convolutionalLayersNumber'] + "_conv_" +
+                    self.configuration['maxNeighbours'] + "_neighbors_train_confusion_matrix.png")
         plt.close()
         validation_confusion_matrix_plot = ConfusionMatrixDisplay(validation_confusion_matrix, display_labels=labels)
         validation_confusion_matrix_plot.plot()
         plt.title("Validation Confusion Matrix " + self.configuration['chosenDataset'])
         plt.savefig(self.configuration['chosenDataset'] + "_" +
-                    self.configuration['convolutionalLayersNumber'] + "_conv_"
-                    + self.configuration['maxNeighbours'] + "_neighbors_validation_confusion_matrix.png")
+                    self.configuration['minSimilarityValues'] + "_similarity_" +
+                    self.configuration['convolutionalLayersNumber'] + "_conv_" +
+                    self.configuration['maxNeighbours'] + "_neighbors_validation_confusion_matrix.png")
         plt.close()
 
     def _optimizeGraphConvolutionalNetwork(self):
@@ -300,11 +306,13 @@ class PipeLineManager:
             file.close()
         model = GraphNetwork()
         save_result_path = (self.configuration['pathHyperopt'] + self.configuration['chosenDataset']
-                            + "_" + self.configuration['convolutionalLayersNumber'] + "_conv_"
+                            + "_" + self.configuration['minSimilarityValues'] + "_similarity_"
+                            + self.configuration['convolutionalLayersNumber'] + "_conv_"
                             + self.configuration['maxNeighbours'] + "_neighbors_trained_GCN_result.csv")
         save_model_path = (self.configuration['pathModels'] + self.configuration['chosenDataset'] + "_" +
-                           self.configuration['convolutionalLayersNumber'] + "_conv_"
-                           + self.configuration['maxNeighbours'] + "_neighbors_trained_GCN.pkl")
+                           self.configuration['minSimilarityValues'] + "_similarity_" +
+                           self.configuration['convolutionalLayersNumber'] + "_conv_" +
+                           self.configuration['maxNeighbours'] + "_neighbors_trained_GCN.pkl")
         space = {
             'input_graph': train_graph,
             'device': self.device,
