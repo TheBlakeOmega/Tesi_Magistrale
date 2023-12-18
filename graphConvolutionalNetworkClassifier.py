@@ -1,6 +1,6 @@
 import torch
 from torch.utils.data import TensorDataset, RandomSampler
-from torch_geometric.nn import GCNConv, Linear
+from torch_geometric.nn import GCNConv, Linear, GATv2Conv
 from torch.nn import Module, ModuleList
 import torch.nn.functional as torch_functional
 from torch_geometric.loader import DataLoader
@@ -23,7 +23,7 @@ class GraphNetwork:
     def __init__(self):
         self.model = None
 
-    def train(self, input_graph, params, device, save_path=None):
+    def train(self, input_graph, params, device, layer_type, save_path=None):
         """
         Train model with input torch_geometric graph and inputs in params
         :param input_graph:
@@ -32,6 +32,8 @@ class GraphNetwork:
         parameters used during train
         :param device:
         device that will compute tensors
+        :param layer_type:
+        type of the layer that will be used in the model: {GCN, GAT}
         :param save_path:
         default None. If specified, it will be the path in which the trained graph will be saved
         """
@@ -40,9 +42,10 @@ class GraphNetwork:
         dropouts = []
         for i in range(params['conv_layers']):
             dropouts.append(params['dropout_' + str(i + 1)])
-        self.model = GCN(data.num_node_features, data.num_classes,
-                         conv_layers_number=params['conv_layers'],
-                         dropouts=dropouts).to(device)
+        self.model = GraphNeuralNetwork(data.num_node_features, data.num_classes,
+                                        conv_layers_number=params['conv_layers'],
+                                        dropouts=dropouts,
+                                        layer_type=layer_type).to(device)
         optimizer = torch.optim.Adam(self.model.parameters(), lr=params['learning_rate'])
         scheduler = torch.optim.lr_scheduler.LinearLR(optimizer, start_factor=1.0, end_factor=0.5, total_iters=300)
         data_loader = self._getDataLoader(data, data.train_mask, batch_size=params['batch_size'])
@@ -139,7 +142,7 @@ class GraphNetwork:
         global best_loss
 
         start_train_time = np.datetime64(datetime.now())
-        outs = self.train(params['input_graph'], params, params['device'])
+        outs = self.train(params['input_graph'], params, params['device'], params['layer_type'])
         end_train_time = np.datetime64(datetime.now())
 
         torch.cuda.empty_cache()
@@ -228,21 +231,21 @@ class GraphNetwork:
         return data_loader
 
 
-class GCN(Module):
+class GraphNeuralNetwork(Module):
     """
     Class to obtain a GCN model for homogeneous graphs
     """
 
-    def __init__(self, num_node_features, num_classes, conv_layers_number, dropouts):
+    def __init__(self, num_node_features, num_classes, conv_layers_number, dropouts, layer_type):
         super().__init__()
         torch.manual_seed(12)
         self.dropouts = dropouts
 
         channels = 512
         self.conv_layers = ModuleList([])
-        self.conv_layers.append(GCNConv(num_node_features, channels))
+        self.conv_layers.append(self._getConvolutionalLayer(layer_type, num_node_features, channels))
         for i in range(conv_layers_number - 1):
-            self.conv_layers.append(GCNConv(int(channels), int(channels / 2)))
+            self.conv_layers.append(self._getConvolutionalLayer(layer_type, int(channels), int(channels / 2)))
             channels /= 2
 
         self.lin1 = Linear(int(channels), int(channels / 2), weight_initializer="glorot")
@@ -268,3 +271,10 @@ class GCN(Module):
 
         x = torch_functional.softmax(x, dim=1)
         return x
+
+    def _getConvolutionalLayer(self, layer_type, in_channels, out_channels):
+        if layer_type == "GCN":
+            return GCNConv(in_channels, out_channels)
+        elif layer_type == "GAT":
+            return GATv2Conv(in_channels, out_channels, edge_dim=1)
+        raise Exception("Layer type not implemented")

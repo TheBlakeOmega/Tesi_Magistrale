@@ -154,10 +154,12 @@ class CosineSimilarityMatrixTrain(CosineSimilarityMatrix):
         for rowIndex, row in enumerate(self.matrix):
             indexed_row = list(enumerate(row))
             top_similarities = sorted(indexed_row, key=operator.itemgetter(1))[
-                               -(max_neighbors + 1):]  # +1 perchè il nodo stesso è considerato vicino
+                               -(max_neighbors + 1):]  # +1 perchè il nodo stesso potrebbe essere considerato vicino
+            neighbors_added = 0
             for (columnIndex, similarity) in top_similarities:
-                if rowIndex != columnIndex and similarity >= threshold:
+                if neighbors_added < max_neighbors and rowIndex != columnIndex and similarity >= threshold:
                     edge_list.append([rowIndex, columnIndex, similarity])
+                    neighbors_added += 1
             if rowIndex % 100 == 0:
                 print("GTG: " + str(rowIndex) + " X examples computed")
         print("GTG: Creating train torch geometric tensors from data")

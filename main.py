@@ -32,7 +32,8 @@ if __name__ == '__main__':
               configuration['convolutionalLayersNumber'] + "_conv_"
               + configuration['minSimilarityValues'] + "_similarity_"
               + configuration['maxNeighbours'] + "_neighbors_"
-              + configuration['chosenPipeline'] + ".txt", "w") as result_file:
+              + configuration['chosenPipeline'] + "_"
+              + configuration['layerType'] + ".txt", "w") as result_file:
         pManager = PipeLineManager(configuration, dsConf, configuration['chosenPipeline'], result_file)
         pManager.runPipeline()
 

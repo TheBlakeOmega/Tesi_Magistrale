@@ -42,19 +42,19 @@ class PipeLineManager:
         if self.chosen_pipeline == 'BUILD_GRAPH':
             try:
                 self._buildGraph()
-                print("Similarity matrices built successfully.")
-                self.result_file.write("Similarity matrices built successfully.")
+                print("Torch Graph built successfully.")
+                self.result_file.write("Torch Graph built successfully.")
             except Exception as e:
                 traceback.print_exc()
                 raise Exception("Error during Graph creation")
-        elif self.chosen_pipeline == 'TRAIN_GCN':
+        elif self.chosen_pipeline == 'TRAIN':
             try:
                 self._trainGraphConvolutionalNetwork()
-                print("GCN trained successfully.")
-                self.result_file.write("GCN trained successfully.")
+                print("Model trained successfully.")
+                self.result_file.write("Model trained successfully.")
             except Exception as e:
                 traceback.print_exc()
-                raise Exception("Error during GCN train")
+                raise Exception("Error during Model train")
         elif self.chosen_pipeline == 'COMPUTE_EVALUATION_METRICS_TRAIN_VALIDATION':
             try:
                 self._computeEvaluationMetricsOnTrainAndValidationSet()
@@ -63,22 +63,22 @@ class PipeLineManager:
             except Exception as e:
                 traceback.print_exc()
                 raise Exception("Error during evaluation metrics computation")
-        elif self.chosen_pipeline == 'TEST_GCN':
+        elif self.chosen_pipeline == 'TEST':
             try:
                 self._testGraphConvolutionalNetwork()
-                print("GCN tested successfully.")
-                self.result_file.write("GCN tested successfully.")
+                print("Model tested successfully.")
+                self.result_file.write("Model tested successfully.")
             except Exception as e:
                 traceback.print_exc()
-                raise Exception("Error during GCN test")
-        elif self.chosen_pipeline == 'OPTIMIZE_GCN':
+                raise Exception("Error during Model test")
+        elif self.chosen_pipeline == 'OPTIMIZE':
             try:
                 self._optimizeGraphConvolutionalNetwork()
-                print("GCN's parameters optimized successfully")
-                self.result_file.write("GCN's parameters optimized successfully.")
+                print("Model's parameters optimized successfully")
+                self.result_file.write("Model's parameters optimized successfully.")
             except Exception as e:
                 traceback.print_exc()
-                raise Exception("Error during GCN optimization")
+                raise Exception("Error during Model optimization")
 
     def _buildGraph(self):
         """
@@ -152,9 +152,10 @@ class PipeLineManager:
         save_path = (self.configuration['pathModels'] + self.configuration['chosenDataset'] +
                      "_" + self.configuration['minSimilarityValues'] + "_similarity_" +
                      self.configuration['convolutionalLayersNumber'] + "_conv_"
-                     + self.configuration['maxNeighbours'] + "_neighbors_trained_GCN.pkl")
+                     + self.configuration['maxNeighbours'] + "_neighbors_trained_" +
+                     self.configuration['layerType'] + ".pkl")
         start_train_time = np.datetime64(datetime.now())
-        scores = model.train(train_graph, space, self.device, save_path)
+        scores = model.train(train_graph, space, self.device, self.configuration['layerType'], save_path)
         end_train_time = np.datetime64(datetime.now())
         self.result_file.write("Trained model result:" + "\nLoss: " + str(scores['train_loss']) +
                                "\nAccuracy: " + str(scores['train_accuracy']) +
@@ -189,7 +190,8 @@ class PipeLineManager:
         model.loadModel(self.configuration['pathModels'] + self.configuration['chosenDataset'] +
                         "_" + self.configuration['minSimilarityValues'] + "_similarity_" +
                         self.configuration['convolutionalLayersNumber'] + "_conv_"
-                        + self.configuration['maxNeighbours'] + "_neighbors_trained_GCN.pkl",
+                        + self.configuration['maxNeighbours'] + "_neighbors_trained_"
+                        + self.configuration['layerType'] + ".pkl",
                         self.device)
         print("TeGCN: Model Loaded")
 
@@ -228,7 +230,8 @@ class PipeLineManager:
         test_confusion_matrix_plot = ConfusionMatrixDisplay(test_confusion_matrix, display_labels=labels)
         test_confusion_matrix_plot.plot()
         plt.title("Test Confusion Matrix " + self.configuration['chosenDataset'])
-        plt.savefig(self.configuration['chosenDataset'] + "_" +
+        plt.savefig(self.configuration['layerType'] + "_" +
+                    self.configuration['chosenDataset'] + "_" +
                     self.configuration['minSimilarityValues'] + "_similarity_" +
                     self.configuration['convolutionalLayersNumber'] + "_conv_" +
                     self.configuration['maxNeighbours'] + "_neighbors_test_confusion_matrix.png")
@@ -250,8 +253,9 @@ class PipeLineManager:
         model = GraphNetwork()
         model.loadModel(self.configuration['pathModels'] + self.configuration['chosenDataset'] +
                         "_" + self.configuration['minSimilarityValues'] + "_similarity_" +
-                        self.configuration['convolutionalLayersNumber'] + "_conv_"
-                        + self.configuration['maxNeighbours'] + "_neighbors_trained_GCN.pkl",
+                        self.configuration['convolutionalLayersNumber'] + "_conv_" +
+                        self.configuration['maxNeighbours'] + "_neighbors_trained_" +
+                        self.configuration['layerType'] + ".pkl",
                         self.device)
         print("CCM: Computing predictions")
         predictions = model.test(input_graph, self.device)
@@ -283,7 +287,8 @@ class PipeLineManager:
         train_confusion_matrix_plot = ConfusionMatrixDisplay(train_confusion_matrix, display_labels=labels)
         train_confusion_matrix_plot.plot()
         plt.title("Train Confusion Matrix " + self.configuration['chosenDataset'])
-        plt.savefig(self.configuration['chosenDataset'] + "_" +
+        plt.savefig(self.configuration['layerType'] + "_" +
+                    self.configuration['chosenDataset'] + "_" +
                     self.configuration['minSimilarityValues'] + "_similarity_" +
                     self.configuration['convolutionalLayersNumber'] + "_conv_" +
                     self.configuration['maxNeighbours'] + "_neighbors_train_confusion_matrix.png")
@@ -291,7 +296,8 @@ class PipeLineManager:
         validation_confusion_matrix_plot = ConfusionMatrixDisplay(validation_confusion_matrix, display_labels=labels)
         validation_confusion_matrix_plot.plot()
         plt.title("Validation Confusion Matrix " + self.configuration['chosenDataset'])
-        plt.savefig(self.configuration['chosenDataset'] + "_" +
+        plt.savefig(self.configuration['layerType'] + "_" +
+                    self.configuration['chosenDataset'] + "_" +
                     self.configuration['minSimilarityValues'] + "_similarity_" +
                     self.configuration['convolutionalLayersNumber'] + "_conv_" +
                     self.configuration['maxNeighbours'] + "_neighbors_validation_confusion_matrix.png")
@@ -313,11 +319,13 @@ class PipeLineManager:
         save_result_path = (self.configuration['pathHyperopt'] + self.configuration['chosenDataset']
                             + "_" + self.configuration['minSimilarityValues'] + "_similarity_"
                             + self.configuration['convolutionalLayersNumber'] + "_conv_"
-                            + self.configuration['maxNeighbours'] + "_neighbors_trained_GCN_result.csv")
+                            + self.configuration['maxNeighbours'] + "_neighbors_trained_"
+                            + self.configuration['layerType'] + "_result.csv")
         save_model_path = (self.configuration['pathModels'] + self.configuration['chosenDataset'] + "_" +
                            self.configuration['minSimilarityValues'] + "_similarity_" +
                            self.configuration['convolutionalLayersNumber'] + "_conv_" +
-                           self.configuration['maxNeighbours'] + "_neighbors_trained_GCN.pkl")
+                           self.configuration['maxNeighbours'] + "_neighbors_trained_" +
+                           self.configuration['layerType'] + ".pkl")
         space = {
             'input_graph': train_graph,
             'device': self.device,
@@ -327,7 +335,8 @@ class PipeLineManager:
             'learning_rate': hp.uniform("learning_rate", 0.0001, 0.001),
             'batch_size': hp.choice("batch", [32, 64, 128, 256, 512]),
             'epochs': int(self.configuration['trainEpochs']),
-            'earlyStoppingThresh': int(self.configuration['earlyStoppingThresh'])
+            'earlyStoppingThresh': int(self.configuration['earlyStoppingThresh']),
+            'layer_type': self.configuration['layerType']
         }
         for i in range(int(self.configuration['convolutionalLayersNumber'])):
             space['dropout_' + str(i + 1)] = hp.uniform('dropout_' + str(i + 1), 0, 1)
