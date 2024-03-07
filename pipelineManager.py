@@ -1,5 +1,5 @@
 from dataset import Dataset
-from cosineSimilarityMatrix import CosineSimilarityMatrixTrain, CosineSimilarityMatrixTest
+from similarityMatrix import SimilarityMatrixTrain, SimilarityMatrixTest
 import traceback
 import pickle
 import torch
@@ -95,13 +95,13 @@ class PipeLineManager:
               + '    rows:' + str(len(test_dataset.getFeatureData().index)) + "\n\n")
 
         print("\n GETTING COSINE SIMILARITY MATRICES \n")
-        train_matrix = CosineSimilarityMatrixTrain()
-        test_matrix = CosineSimilarityMatrixTest()
+        train_matrix = SimilarityMatrixTrain()
+        test_matrix = SimilarityMatrixTest()
         try:
             train_matrix.loadMatrix(self.configuration['pathSimilarityMatrices'] + self.configuration['chosenDataset'] +
-                                    "_train_similarity_matrix.pkl")
+                                    "_" + self.configuration['examplesSimilarityType'] + "_train_matrix.pkl")
             test_matrix.loadMatrix(self.configuration['pathSimilarityMatrices'] + self.configuration['chosenDataset'] +
-                                   "_test_similarity_matrix.pkl")
+                                   "_" + self.configuration['examplesSimilarityType'] + "_test_matrix.pkl")
         except FileNotFoundError:
             print("Building PCA model and transforming feature data\n")
             pca_model = train_dataset.pca(float(self.configuration['PCA_n_components']),
@@ -109,21 +109,40 @@ class PipeLineManager:
                                           + str(self.configuration['PCA_n_components']))
             train_PCA_components = train_dataset.pcaTransform(pca_model)
             test_PCA_components = test_dataset.pcaTransform(pca_model)
-            train_matrix.computeMatrix(train_PCA_components)
-            test_matrix.computeMatrix(train_PCA_components, test_PCA_components)
+            train_matrix.computeMatrix(self.configuration['examplesSimilarityType'], train_PCA_components, None,
+                                       self.configuration['pathSimilarityMatrices'] +
+                                       self.configuration['chosenDataset'] + "_" +
+                                       self.configuration['examplesSimilarityType'] + "_train_matrix.pkl")
+            test_matrix.computeMatrix(self.configuration['examplesSimilarityType'], train_PCA_components,
+                                      test_PCA_components,
+                                      self.configuration['pathSimilarityMatrices'] +
+                                      self.configuration['chosenDataset'] +
+                                      "_" + self.configuration['examplesSimilarityType'] +
+                                      "_test_matrix.pkl")
         print("\n")
         self.result_file.write("Train similarity matrix:\n" + str(train_matrix.matrix) + " \nShapes: " +
                                str(train_matrix.matrix.shape) + "\n\n")
         self.result_file.write("Test similarity matrix:\n" + str(test_matrix.matrix) + " \nShapes: " +
                                str(test_matrix.matrix.shape) + "\n\n")
 
-        # train_matrix.buildSimilarityBoxPlot()
-        # train_matrix.buildNeighborCountBoxPlotAndReport(float(self.configuration['minSimilarityValues']))
+        """
+        train_matrix.buildSimilarityBoxPlot()
+        max_value, min_value, mean_value, standard_deviation, number_isolated_examples = (
+            train_matrix.buildNeighborCountBoxPlotAndReport(float(self.configuration['minSimilarityValues'])))
+        self.result_file.write("Train similarity matrix metrics:\n  max neighbors: " + str(max_value) + "\n"
+                               + "  min neighbors: " + str(min_value) + "\n"
+                               + "  mean neighbors: " + str(mean_value) + "\n"
+                               + "  std dev neighbors: " + str(standard_deviation) + "\n"
+                               + "  number of isolated nodes: " + str(number_isolated_examples)
+                               + "\n\n")
+        """
 
         print("\n COMPUTING TORCH GRAPHS \n")
-        train_graph_save_path = (self.configuration['pathPytorchGraphs'] + self.configuration['chosenDataset']
-                                 + "_" + self.configuration['minSimilarityValues'] + "_similarity_"
-                                 + self.configuration['maxNeighbours'] + "_neighbors_train_torch_graph.pkl")
+        train_graph_save_path = (self.configuration['pathPytorchGraphs'] + "/" +
+                                 self.configuration['examplesSimilarityType'] + "/" +
+                                 self.configuration['chosenDataset'] + "_" + self.configuration['minSimilarityValues']
+                                 + "_similarity_" + self.configuration['maxNeighbours'] +
+                                 "_neighbors_train_torch_graph.pkl")
         train_graph = train_matrix.generateTrainTorchGraph(train_dataset,
                                                            float(self.configuration['minSimilarityValues']),
                                                            int(self.configuration['maxNeighbours']),
@@ -135,9 +154,9 @@ class PipeLineManager:
         """
         This method runs the pipeline to train and serialize GCN model
         """
-        load_path = (self.configuration['pathPytorchGraphs'] + self.configuration['chosenDataset']
-                     + "_" + self.configuration['minSimilarityValues'] + "_similarity_"
-                     + "_" + self.configuration['maxNeighbours'] + "_neighbors_train_torch_graph.pkl")
+        load_path = (self.configuration['pathPytorchGraphs'] + "/" + self.configuration['examplesSimilarityType'] + "/"
+                     + self.configuration['chosenDataset'] + "_" + self.configuration['minSimilarityValues']
+                     + "_similarity_" + self.configuration['maxNeighbours'] + "_neighbors_train_torch_graph.pkl")
         with open(load_path, 'rb') as file:
             print("TGCN: Loading train graph from " + load_path)
             train_graph = pickle.load(file)
@@ -149,9 +168,9 @@ class PipeLineManager:
             'earlyStoppingThresh': 200
         }
         print("Starting GCN training on " + torch.cuda.get_device_name(0) + " " + str(self.device))
-        save_path = (self.configuration['pathModels'] + self.configuration['chosenDataset'] +
-                     "_" + self.configuration['minSimilarityValues'] + "_similarity_" +
-                     self.configuration['convolutionalLayersNumber'] + "_conv_"
+        save_path = (self.configuration['pathModels'] + "/" + + self.configuration['examplesSimilarityType'] + "/" +
+                     self.configuration['chosenDataset'] + "_" + self.configuration['minSimilarityValues']
+                     + "_similarity_" + self.configuration['convolutionalLayersNumber'] + "_conv_"
                      + self.configuration['maxNeighbours'] + "_neighbors_trained_" +
                      self.configuration['layerType'] + ".pkl")
         start_train_time = np.datetime64(datetime.now())
@@ -169,15 +188,16 @@ class PipeLineManager:
         test_dataset = Dataset(self.ds_configuration['pathTestDataset'],
                                self.ds_configuration['labelColumnName'])
         print("TeGCN: Dataset Loaded")
-        print("TeGCN: Loading test similarity matrix from " + self.configuration['pathSimilarityMatrices'] +
-              self.configuration['chosenDataset'] + "_test_similarity_matrix.pkl")
-        test_matrix = CosineSimilarityMatrixTest()
+        print("TeGCN: Loading test similarity matrix from " + self.configuration['pathSimilarityMatrices']
+              + self.configuration['chosenDataset'] + "_" + self.configuration['examplesSimilarityType'] +
+              self.configuration['examplesSimilarityType'] + "_test_matrix.pkl")
+        test_matrix = SimilarityMatrixTest()
         test_matrix.loadMatrix(self.configuration['pathSimilarityMatrices'] + self.configuration['chosenDataset'] +
-                               "_test_similarity_matrix.pkl")
+                               "_" + self.configuration['examplesSimilarityType'] + "_test_matrix.pkl")
         print("TeGCN: Similarity Matrix Loaded")
-        graph_load_path = (self.configuration['pathPytorchGraphs'] + self.configuration['chosenDataset']
-                           + "_" + self.configuration['minSimilarityValues'] + "_similarity_"
-                           + self.configuration['maxNeighbours'] + "_neighbors_train_torch_graph.pkl")
+        graph_load_path = (self.configuration['pathPytorchGraphs'] + "/" + self.configuration['examplesSimilarityType']
+                           + "/" + self.configuration['chosenDataset'] + "_" + self.configuration['minSimilarityValues']
+                           + "_similarity_" + self.configuration['maxNeighbours'] + "_neighbors_train_torch_graph.pkl")
         with open(graph_load_path, 'rb') as file:
             print("TeGCN: Loading train graph from " + graph_load_path)
             train_graph = pickle.load(file)
@@ -187,11 +207,11 @@ class PipeLineManager:
         print("TeGCN: Loading model from " + self.configuration['pathModels'] + self.configuration['chosenDataset'] +
               "_trained_GCN.pkl")
         model = GraphNetwork()
-        model.loadModel(self.configuration['pathModels'] + self.configuration['chosenDataset'] +
-                        "_" + self.configuration['minSimilarityValues'] + "_similarity_" +
-                        self.configuration['convolutionalLayersNumber'] + "_conv_"
-                        + self.configuration['maxNeighbours'] + "_neighbors_trained_"
-                        + self.configuration['layerType'] + ".pkl",
+        model.loadModel(self.configuration['pathModels'] + "/" + self.configuration['examplesSimilarityType'] + "/" +
+                        self.configuration['chosenDataset'] + "_" + self.configuration['minSimilarityValues']
+                        + "_similarity_" + self.configuration['convolutionalLayersNumber'] + "_conv_"
+                        + self.configuration['maxNeighbours'] + "_neighbors_trained_" +
+                        self.configuration['layerType'] + ".pkl",
                         self.device)
         print("TeGCN: Model Loaded")
 
@@ -241,9 +261,9 @@ class PipeLineManager:
         """
         This method runs the pipeline to compute evaluation metrics on train and validation set
         """
-        graph_load_path = (self.configuration['pathPytorchGraphs'] + self.configuration['chosenDataset']
-                           + "_" + self.configuration['minSimilarityValues'] + "_similarity_"
-                           + self.configuration['maxNeighbours'] + "_neighbors_train_torch_graph.pkl")
+        graph_load_path = (self.configuration['pathPytorchGraphs'] + "/" + self.configuration['examplesSimilarityType']
+                           + "/" + self.configuration['chosenDataset'] + "_" + self.configuration['minSimilarityValues']
+                           + "_similarity_" + self.configuration['maxNeighbours'] + "_neighbors_train_torch_graph.pkl")
         with open(graph_load_path, 'rb') as file:
             print("CCM: Loading train graph from " + graph_load_path)
             input_graph = pickle.load(file)
@@ -251,10 +271,10 @@ class PipeLineManager:
             print("CCM: Train graph loaded")
             file.close()
         model = GraphNetwork()
-        model.loadModel(self.configuration['pathModels'] + self.configuration['chosenDataset'] +
-                        "_" + self.configuration['minSimilarityValues'] + "_similarity_" +
-                        self.configuration['convolutionalLayersNumber'] + "_conv_" +
-                        self.configuration['maxNeighbours'] + "_neighbors_trained_" +
+        model.loadModel(self.configuration['pathModels'] + "/" + self.configuration['examplesSimilarityType'] + "/" +
+                        self.configuration['chosenDataset'] + "_" + self.configuration['minSimilarityValues']
+                        + "_similarity_" + self.configuration['convolutionalLayersNumber'] + "_conv_"
+                        + self.configuration['maxNeighbours'] + "_neighbors_trained_" +
                         self.configuration['layerType'] + ".pkl",
                         self.device)
         print("CCM: Computing predictions")
@@ -307,9 +327,9 @@ class PipeLineManager:
         """
         This method runs the pipeline to optimize train's parameters
         """
-        load_path = (self.configuration['pathPytorchGraphs'] + self.configuration['chosenDataset']
-                     + "_" + self.configuration['minSimilarityValues'] + "_similarity_"
-                     + self.configuration['maxNeighbours'] + "_neighbors_train_torch_graph.pkl")
+        load_path = (self.configuration['pathPytorchGraphs'] + "/" + self.configuration['examplesSimilarityType']
+                     + "/" + self.configuration['chosenDataset'] + "_" + self.configuration['minSimilarityValues']
+                     + "_similarity_" + self.configuration['maxNeighbours'] + "_neighbors_train_torch_graph.pkl")
         with open(load_path, 'rb') as file:
             print("OGCN: Loading train graph from " + load_path)
             train_graph = pickle.load(file)
@@ -321,11 +341,11 @@ class PipeLineManager:
                             + self.configuration['convolutionalLayersNumber'] + "_conv_"
                             + self.configuration['maxNeighbours'] + "_neighbors_trained_"
                             + self.configuration['layerType'] + "_result.csv")
-        save_model_path = (self.configuration['pathModels'] + self.configuration['chosenDataset'] + "_" +
-                           self.configuration['minSimilarityValues'] + "_similarity_" +
-                           self.configuration['convolutionalLayersNumber'] + "_conv_" +
-                           self.configuration['maxNeighbours'] + "_neighbors_trained_" +
-                           self.configuration['layerType'] + ".pkl")
+        save_model_path = (self.configuration['pathModels'] + "/" + self.configuration['examplesSimilarityType'] + "/"
+                           + self.configuration['chosenDataset'] + "_" + self.configuration['minSimilarityValues']
+                           + "_similarity_" + self.configuration['convolutionalLayersNumber'] + "_conv_"
+                           + self.configuration['maxNeighbours'] + "_neighbors_trained_"
+                           + self.configuration['layerType'] + ".pkl")
         space = {
             'input_graph': train_graph,
             'device': self.device,

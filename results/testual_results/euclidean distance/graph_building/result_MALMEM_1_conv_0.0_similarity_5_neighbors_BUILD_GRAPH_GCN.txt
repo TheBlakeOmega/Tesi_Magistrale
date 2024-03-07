@@ -1,0 +1,30 @@
+Train similarity matrix:
+[[ 0.     1.589  2.11  ...  1.629  2.043  1.365]
+ [ 1.589  0.     3.564 ... 21.98   3.67   6.37 ]
+ [ 2.11   3.564  0.    ...  3.549 55.22   2.4  ]
+ ...
+ [ 1.629 21.98   3.549 ...  0.     3.646  5.746]
+ [ 2.043  3.67  55.22  ...  3.646  0.     2.438]
+ [ 1.365  6.37   2.4   ...  5.746  2.438  0.   ]] 
+Shapes: (46876, 46876)
+
+Test similarity matrix:
+[[ 1.408  1.563  2.701 ...  1.437  1.898 12.79 ]
+ [ 1.568  2.752  3.105 ...  7.977  3.223  1.568]
+ [ 1.308  4.836  3.766 ...  3.553  9.7    2.023]
+ ...
+ [ 1.583  2.723  3.172 ...  6.58   3.092  1.616]
+ [ 1.295  5.203  3.61  ...  3.727  9.43   1.968]
+ [ 1.718  1.992  2.406 ...  4.516  2.365  1.343]] 
+Shapes: (46876, 11720)
+
+Train similarity matrix metrics:
+  max neighbors: 46875
+  min neighbors: 46875
+  mean neighbors: 46875.0
+  std dev neighbors: 0.0
+  number of isolated nodes: 0
+
+Train graph info:Data(x=[46876, 52], edge_index=[2, 234380], y=[46876, 1], edge_weight=[234380], num_classes=4, num_nodes=46876, train_mask=[46876], validation_mask=[46876])
+
+Torch Graph built successfully.

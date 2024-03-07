@@ -1,0 +1,39 @@
+Train confusion matrix:
+[[ 783   50   66   44   62]
+ [  90  304  105  115   88]
+ [  38   38  822  194   84]
+ [   6    9   48 2097   26]
+ [  73   43  134   87 1088]]
+Train classification report:
+              precision    recall  f1-score   support
+
+           0      0.791     0.779     0.785      1005
+           1      0.685     0.433     0.531       702
+           2      0.700     0.699     0.699      1176
+           3      0.827     0.959     0.888      2186
+           4      0.807     0.764     0.785      1425
+
+    accuracy                          0.784      6494
+   macro avg      0.762     0.727     0.737      6494
+weighted avg      0.778     0.784     0.777      6494
+
+Validation confusion matrix:
+[[172  19  18  13  29]
+ [ 28  69  28  28  22]
+ [ 17   8 196  50  23]
+ [  1   4  17 518   7]
+ [ 18  18  41  14 266]]
+Validation classification report:
+              precision    recall  f1-score   support
+
+           0      0.729     0.685     0.706       251
+           1      0.585     0.394     0.471       175
+           2      0.653     0.667     0.660       294
+           3      0.831     0.947     0.885       547
+           4      0.767     0.745     0.756       357
+
+    accuracy                          0.752      1624
+   macro avg      0.713     0.688     0.696      1624
+weighted avg      0.742     0.752     0.744      1624
+
+Evaluation metrics computed successfully.
